@@ -225,6 +225,13 @@ export type Database = {
           uf: string
         }[]
       }
+      get_activity_breakdown: {
+        Args: { p_cidade?: string; p_days?: number }
+        Returns: {
+          tipo: string
+          total: number
+        }[]
+      }
       get_activity_trend: {
         Args: { p_cidade?: string; p_days?: number }
         Returns: {
@@ -430,6 +437,26 @@ export type Database = {
           total_leads_qualificados: number
           total_reunioes: number
           valor_pipeline: number
+        }[]
+      }
+      get_pipeline_by_stage: {
+        Args: { p_cidade?: string }
+        Returns: {
+          estagio: string
+          total_leads: number
+          valor_total: number
+        }[]
+      }
+      get_sdr_performance: {
+        Args: { p_cidade?: string; p_days?: number }
+        Returns: {
+          emails: number
+          ligacoes: number
+          nome: string
+          pesquisas: number
+          reunioes: number
+          user_id: string
+          whatsapps: number
         }[]
       }
       get_user_role: { Args: { _user_id: string }; Returns: string }
