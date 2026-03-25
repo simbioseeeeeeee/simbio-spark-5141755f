@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Search, Users, List, Columns3, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Building2, Search, Users, List, Columns3, Loader2, ChevronLeft, ChevronRight, Bot } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function Index() {
