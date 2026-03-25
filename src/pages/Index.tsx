@@ -1,64 +1,65 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Lead, LeadStatus, STATUS_OPTIONS } from "@/types/lead";
-import { getLeads } from "@/store/leads-store";
-import { CSVImport } from "@/components/CSVImport";
+import { getLeadsPaginated, getStatusCounts, LeadsResult } from "@/store/leads-store";
 import { StatusBadge } from "@/components/StatusBadge";
 import { LeadProfile } from "@/components/LeadProfile";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Search, Users, List, Columns3, Loader2 } from "lucide-react";
+import { Building2, Search, Users, List, Columns3, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function Index() {
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [result, setResult] = useState<LeadsResult>({ leads: [], total: 0, page: 0, pageSize: 50 });
+  const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [view, setView] = useState<"sdr" | "closer">("sdr");
   const [loading, setLoading] = useState(true);
+  const [counts, setCounts] = useState<Record<string, number>>({ all: 0 });
 
-  const reload = async () => {
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(0);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Reset page on filter change
+  useEffect(() => { setPage(0); }, [statusFilter]);
+
+  const loadLeads = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await getLeads();
-      setLeads(data);
+      const [data, statusCounts] = await Promise.all([
+        getLeadsPaginated({ page, search: debouncedSearch, statusFilter }),
+        getStatusCounts(),
+      ]);
+      setResult(data);
+      setCounts(statusCounts);
     } catch (err: any) {
       toast({ title: "Erro ao carregar leads", description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, debouncedSearch, statusFilter]);
 
-  useEffect(() => { reload(); }, []);
+  useEffect(() => { loadLeads(); }, [loadLeads]);
 
-  const filtered = useMemo(() => {
-    let list = leads;
-    if (statusFilter !== "all") list = list.filter((l) => l.status_sdr === statusFilter);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter((l) =>
-        l.razao_social.toLowerCase().includes(q) ||
-        l.fantasia.toLowerCase().includes(q) ||
-        l.cnpj.includes(q) ||
-        l.bairro.toLowerCase().includes(q) ||
-        l.telefone1.includes(q) ||
-        l.celular1.includes(q)
-      );
-    }
-    return list;
-  }, [leads, search, statusFilter]);
-
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { all: leads.length };
-    STATUS_OPTIONS.forEach((s) => (c[s] = leads.filter((l) => l.status_sdr === s).length));
-    return c;
-  }, [leads]);
+  const totalPages = Math.ceil(result.total / result.pageSize);
 
   const handleSaved = (updated: Lead) => {
-    setLeads((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
+    setResult((prev) => ({
+      ...prev,
+      leads: prev.leads.map((l) => (l.id === updated.id ? updated : l)),
+    }));
     setSelectedLead(updated);
   };
 
@@ -75,15 +76,12 @@ export default function Index() {
               <p className="text-xs text-muted-foreground">Prospecção & Qualificação B2B</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Tabs value={view} onValueChange={(v) => setView(v as "sdr" | "closer")}>
-              <TabsList>
-                <TabsTrigger value="sdr" className="gap-1.5"><List className="h-4 w-4" /> SDR</TabsTrigger>
-                <TabsTrigger value="closer" className="gap-1.5"><Columns3 className="h-4 w-4" /> Closer</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <CSVImport onImported={reload} />
-          </div>
+          <Tabs value={view} onValueChange={(v) => setView(v as "sdr" | "closer")}>
+            <TabsList>
+              <TabsTrigger value="sdr" className="gap-1.5"><List className="h-4 w-4" /> SDR</TabsTrigger>
+              <TabsTrigger value="closer" className="gap-1.5"><Columns3 className="h-4 w-4" /> Closer</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </header>
 
@@ -109,7 +107,12 @@ export default function Index() {
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar por nome, CNPJ, bairro ou telefone..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+                <Input
+                  placeholder="Buscar por nome, CNPJ, bairro, cidade ou telefone..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full sm:w-[220px]">
@@ -127,11 +130,11 @@ export default function Index() {
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
-            ) : leads.length === 0 ? (
+            ) : result.total === 0 ? (
               <div className="text-center py-20 text-muted-foreground">
                 <Users className="h-12 w-12 mx-auto mb-4 opacity-40" />
-                <p className="text-lg font-medium">Nenhum lead importado</p>
-                <p className="text-sm mt-1">Use o botão "Importar CSV" para começar.</p>
+                <p className="text-lg font-medium">Nenhum lead encontrado</p>
+                <p className="text-sm mt-1">Ajuste os filtros ou importe dados pelo painel do banco.</p>
               </div>
             ) : (
               <div className="rounded-lg border border-border bg-card overflow-hidden">
@@ -146,24 +149,47 @@ export default function Index() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filtered.map((lead) => (
-                        <TableRow key={lead.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setSelectedLead(lead)}>
+                      {result.leads.map((lead) => (
+                        <TableRow
+                          key={lead.id}
+                          className="cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => setSelectedLead(lead)}
+                        >
                           <TableCell><StatusBadge status={lead.status_sdr} /></TableCell>
                           <TableCell className="font-medium">{lead.fantasia || lead.razao_social}</TableCell>
                           <TableCell className="text-muted-foreground font-mono text-xs">{lead.cnpj}</TableCell>
                           <TableCell className="text-muted-foreground">{lead.cidade}/{lead.uf}</TableCell>
                         </TableRow>
                       ))}
-                      {filtered.length === 0 && (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Nenhum lead encontrado com os filtros aplicados.</TableCell>
-                        </TableRow>
-                      )}
                     </TableBody>
                   </Table>
                 </div>
-                <div className="px-4 py-2 border-t border-border text-xs text-muted-foreground">
-                  {filtered.length} de {leads.length} leads
+                {/* Pagination */}
+                <div className="px-4 py-3 border-t border-border flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Mostrando {page * result.pageSize + 1}–{Math.min((page + 1) * result.pageSize, result.total)} de {result.total} leads
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page === 0}
+                      onClick={() => setPage((p) => p - 1)}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      {page + 1} / {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page >= totalPages - 1}
+                      onClick={() => setPage((p) => p + 1)}
+                    >
+                      Próximo <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
@@ -171,13 +197,7 @@ export default function Index() {
         )}
 
         {view === "closer" && (
-          loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <KanbanBoard leads={leads} onSelectLead={setSelectedLead} onLeadUpdated={handleSaved} />
-          )
+          <KanbanBoard onSelectLead={setSelectedLead} onLeadUpdated={handleSaved} />
         )}
       </main>
 

@@ -1,7 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Lead, Socio } from "@/types/lead";
 
-// Helper to map DB row to Lead interface
+const PAGE_SIZE = 50;
+
 function rowToLead(row: any): Lead {
   return {
     id: row.id,
@@ -24,7 +25,7 @@ function rowToLead(row: any): Lead {
     celular2: row.celular2 || "",
     email1: row.email1 || "",
     email2: row.email2 || "",
-    socios: Array.isArray(row.socios) ? row.socios as Socio[] : [],
+    socios: Array.isArray(row.socios) ? (row.socios as Socio[]) : [],
     status_sdr: row.status_sdr || "A Contatar",
     possui_site: row.possui_site || false,
     url_site: row.url_site || "",
@@ -40,11 +41,82 @@ function rowToLead(row: any): Lead {
   };
 }
 
-export async function getLeads(): Promise<Lead[]> {
+export interface LeadsQuery {
+  page: number;
+  search?: string;
+  statusFilter?: string;
+}
+
+export interface LeadsResult {
+  leads: Lead[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export async function getLeadsPaginated({ page, search, statusFilter }: LeadsQuery): Promise<LeadsResult> {
+  let query = supabase
+    .from("leads")
+    .select("*", { count: "exact" });
+
+  if (statusFilter && statusFilter !== "all") {
+    query = query.eq("status_sdr", statusFilter);
+  }
+
+  if (search && search.trim()) {
+    const q = `%${search.trim()}%`;
+    query = query.or(
+      `razao_social.ilike.${q},fantasia.ilike.${q},cnpj.ilike.${q},bairro.ilike.${q},cidade.ilike.${q},telefone1.ilike.${q},celular1.ilike.${q}`
+    );
+  }
+
+  const from = page * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
+
+  const { data, error, count } = await query
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (error) throw error;
+
+  return {
+    leads: (data || []).map(rowToLead),
+    total: count ?? 0,
+    page,
+    pageSize: PAGE_SIZE,
+  };
+}
+
+export async function getStatusCounts(): Promise<Record<string, number>> {
+  // Get total count
+  const { count: total, error: totalErr } = await supabase
+    .from("leads")
+    .select("*", { count: "exact", head: true });
+  if (totalErr) throw totalErr;
+
+  const statuses = ["A Contatar", "Em Qualificação", "Reunião Agendada", "Desqualificado"];
+  const counts: Record<string, number> = { all: total ?? 0 };
+
+  await Promise.all(
+    statuses.map(async (s) => {
+      const { count, error } = await supabase
+        .from("leads")
+        .select("*", { count: "exact", head: true })
+        .eq("status_sdr", s);
+      if (!error) counts[s] = count ?? 0;
+    })
+  );
+
+  return counts;
+}
+
+export async function getKanbanLeads(): Promise<Lead[]> {
   const { data, error } = await supabase
     .from("leads")
     .select("*")
+    .or("status_sdr.eq.Reunião Agendada,estagio_funil.not.is.null")
     .order("created_at", { ascending: false });
+
   if (error) throw error;
   return (data || []).map(rowToLead);
 }
@@ -70,84 +142,4 @@ export async function updateLead(lead: Lead): Promise<Lead> {
     .single();
   if (error) throw error;
   return rowToLead(data);
-}
-
-function clean(val: string | undefined | null): string {
-  if (!val || val === "nan" || val === "NaN" || val === "undefined") return "";
-  return String(val).trim();
-}
-
-function cleanPhone(val: string): string {
-  const c = clean(val).replace(/\.0$/, "");
-  if (!c || c === "1") return "";
-  return c;
-}
-
-export function parseCSV(text: string) {
-  const lines = text.split("\n").filter((l) => l.trim());
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(";");
-  const col = (row: string[], name: string) => {
-    const idx = headers.indexOf(name);
-    return idx >= 0 ? row[idx] || "" : "";
-  };
-
-  return lines.slice(1).map((line) => {
-    const row = line.split(";");
-
-    const socios: Socio[] = [];
-    const s1Nome = clean(col(row, "Socio1Nome"));
-    if (s1Nome) {
-      socios.push({
-        nome: s1Nome,
-        telefone1: cleanPhone(col(row, "Socio1Telefone1")),
-        telefone2: cleanPhone(col(row, "Socio1Telefone2")),
-        celular1: cleanPhone(col(row, "Socio1Celular1")),
-        celular2: cleanPhone(col(row, "Socio1Celular2")),
-        email1: clean(col(row, "Socio1Email1")),
-      });
-    }
-    const s2Nome = clean(col(row, "Socio2Nome"));
-    if (s2Nome) {
-      socios.push({
-        nome: s2Nome,
-        telefone1: cleanPhone(col(row, "Socio2Telefone1")),
-        celular1: cleanPhone(col(row, "Socio2Celular1")),
-        email1: clean(col(row, "Socio2Email1")),
-      });
-    }
-
-    return {
-      cnpj: clean(col(row, "CNPJ")).replace(/\.0$/, ""),
-      razao_social: clean(col(row, "RazaoSocial")),
-      fantasia: clean(col(row, "Fantasia")),
-      data_abertura: clean(col(row, "DataAbertura")),
-      situacao: clean(col(row, "SituacaoReceitaFederal")),
-      cnae_descricao: clean(col(row, "CNAEDescricao")),
-      logradouro: `${clean(col(row, "TipoLogradouro"))} ${clean(col(row, "Logradouro"))}`.trim(),
-      numero: clean(col(row, "Numero")),
-      complemento: clean(col(row, "Complemento")),
-      bairro: clean(col(row, "Bairro")),
-      cidade: clean(col(row, "Cidade")),
-      uf: clean(col(row, "UF")),
-      cep: clean(col(row, "CEP")).replace(/\.0$/, ""),
-      telefone1: cleanPhone(col(row, "Telefone1")),
-      telefone2: cleanPhone(col(row, "Telefone2")),
-      celular1: cleanPhone(col(row, "Celular1")),
-      celular2: cleanPhone(col(row, "Celular2")),
-      email1: clean(col(row, "Email1")),
-      email2: clean(col(row, "Email2")),
-      socios: socios as any,
-    };
-  });
-}
-
-export async function importLeads(csvLeads: ReturnType<typeof parseCSV>): Promise<number> {
-  // Upsert by CNPJ
-  const { data, error } = await supabase
-    .from("leads")
-    .upsert(csvLeads, { onConflict: "cnpj" })
-    .select();
-  if (error) throw error;
-  return data?.length || 0;
 }
