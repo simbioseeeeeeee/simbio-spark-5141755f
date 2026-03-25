@@ -14,7 +14,114 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      leads: {
+        Row: {
+          bairro: string | null
+          celular1: string | null
+          celular2: string | null
+          cep: string | null
+          cidade: string | null
+          cnae_descricao: string | null
+          cnpj: string | null
+          complemento: string | null
+          created_at: string
+          data_abertura: string | null
+          data_proximo_passo: string | null
+          email1: string | null
+          email2: string | null
+          estagio_funil: string | null
+          fantasia: string | null
+          faz_anuncios: boolean
+          id: string
+          instagram_ativo: boolean
+          logradouro: string | null
+          numero: string | null
+          observacoes_closer: string | null
+          observacoes_sdr: string | null
+          possui_site: boolean
+          razao_social: string | null
+          situacao: string | null
+          socios: Json | null
+          status_sdr: string
+          telefone1: string | null
+          telefone2: string | null
+          uf: string | null
+          url_instagram: string | null
+          url_site: string | null
+          valor_negocio_estimado: number | null
+        }
+        Insert: {
+          bairro?: string | null
+          celular1?: string | null
+          celular2?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnae_descricao?: string | null
+          cnpj?: string | null
+          complemento?: string | null
+          created_at?: string
+          data_abertura?: string | null
+          data_proximo_passo?: string | null
+          email1?: string | null
+          email2?: string | null
+          estagio_funil?: string | null
+          fantasia?: string | null
+          faz_anuncios?: boolean
+          id?: string
+          instagram_ativo?: boolean
+          logradouro?: string | null
+          numero?: string | null
+          observacoes_closer?: string | null
+          observacoes_sdr?: string | null
+          possui_site?: boolean
+          razao_social?: string | null
+          situacao?: string | null
+          socios?: Json | null
+          status_sdr?: string
+          telefone1?: string | null
+          telefone2?: string | null
+          uf?: string | null
+          url_instagram?: string | null
+          url_site?: string | null
+          valor_negocio_estimado?: number | null
+        }
+        Update: {
+          bairro?: string | null
+          celular1?: string | null
+          celular2?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnae_descricao?: string | null
+          cnpj?: string | null
+          complemento?: string | null
+          created_at?: string
+          data_abertura?: string | null
+          data_proximo_passo?: string | null
+          email1?: string | null
+          email2?: string | null
+          estagio_funil?: string | null
+          fantasia?: string | null
+          faz_anuncios?: boolean
+          id?: string
+          instagram_ativo?: boolean
+          logradouro?: string | null
+          numero?: string | null
+          observacoes_closer?: string | null
+          observacoes_sdr?: string | null
+          possui_site?: boolean
+          razao_social?: string | null
+          situacao?: string | null
+          socios?: Json | null
+          status_sdr?: string
+          telefone1?: string | null
+          telefone2?: string | null
+          uf?: string | null
+          url_instagram?: string | null
+          url_site?: string | null
+          valor_negocio_estimado?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
