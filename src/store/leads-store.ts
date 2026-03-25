@@ -175,6 +175,8 @@ export async function updateLead(lead: Lead): Promise<Lead> {
       url_instagram: lead.url_instagram,
       faz_anuncios: lead.faz_anuncios,
       whatsapp_automacao: lead.whatsapp_automacao,
+      pesquisa_realizada: lead.pesquisa_realizada,
+      lead_score: lead.lead_score,
       observacoes_sdr: lead.observacoes_sdr,
       estagio_funil: lead.estagio_funil,
       valor_negocio_estimado: lead.valor_negocio_estimado,
