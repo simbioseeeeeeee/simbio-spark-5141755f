@@ -14,7 +14,8 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/hooks/use-toast";
-import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles } from "lucide-react";
 
 function calculateScore(lead: Lead): number {
   let score = 0;
@@ -80,6 +81,7 @@ interface Props {
 export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
   const [form, setForm] = useState<Lead | null>(null);
   const [saving, setSaving] = useState(false);
+  const [researching, setResearching] = useState(false);
 
   const current = form?.id === lead?.id ? form : lead;
 
@@ -88,6 +90,48 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
   const setField = <K extends keyof Lead>(key: K, val: Lead[K]) => {
     if (!current) return;
     setForm({ ...current, [key]: val });
+  };
+
+  const handleAutoResearch = async () => {
+    if (!current) return;
+    setResearching(true);
+    try {
+      toast({ title: "🔍 Pesquisando...", description: `Analisando ${current.fantasia || current.razao_social} com IA...` });
+
+      const { data, error } = await supabase.functions.invoke('auto-research', {
+        body: {
+          razao_social: current.razao_social,
+          fantasia: current.fantasia,
+          cidade: current.cidade,
+          uf: current.uf,
+          cnae_descricao: current.cnae_descricao,
+        },
+      });
+
+      if (error) throw new Error(error.message);
+      if (!data?.success) throw new Error(data?.error || 'Erro na pesquisa');
+
+      const result = data.data;
+      const updated: Lead = {
+        ...current,
+        possui_site: result.possui_site,
+        url_site: result.url_site || "",
+        instagram_ativo: result.instagram_ativo,
+        url_instagram: result.url_instagram || "",
+        faz_anuncios: result.faz_anuncios,
+        whatsapp_automacao: result.whatsapp_automacao,
+        observacoes_sdr: result.observacoes_sdr || current.observacoes_sdr,
+      };
+      updated.lead_score = calculateScore(updated);
+      updated.pesquisa_realizada = true;
+
+      setForm(updated);
+      toast({ title: "✅ Pesquisa concluída!", description: `Score: ${updated.lead_score} pts. Revise e salve.` });
+    } catch (err: any) {
+      toast({ title: "Erro na pesquisa automática", description: err.message, variant: "destructive" });
+    } finally {
+      setResearching(false);
+    }
   };
 
   const handleSave = async () => {
@@ -201,9 +245,21 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
           {/* Right Column - Qualification */}
           <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(100vh-180px)]">
             <div>
-              <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                <Search className="h-4 w-4 text-primary" /> Painel de Qualificação (SDR)
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <Search className="h-4 w-4 text-primary" /> Painel de Qualificação (SDR)
+                </h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAutoResearch}
+                  disabled={researching}
+                  className="gap-1.5 border-primary/30 text-primary hover:bg-primary/10"
+                >
+                  {researching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {researching ? "Pesquisando..." : "Pesquisa IA"}
+                </Button>
+              </div>
 
               <div className="space-y-4">
                 <div className="space-y-2">
