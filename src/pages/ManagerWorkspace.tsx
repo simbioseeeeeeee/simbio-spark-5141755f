@@ -101,6 +101,64 @@ function AnalyticsView({ territorio }: { territorio: string }) {
         <KpiCard label="Pipeline (R$)" value={formatCurrency(Number(analytics.valor_pipeline))} icon={DollarSign} color="bg-primary/10 text-primary" />
       </div>
 
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Activity Trend */}
+        <div className="rounded-lg border border-border bg-card p-5 space-y-3">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Activity className="h-4 w-4 text-primary" />
+            Atividades por Dia
+          </h3>
+          <div className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trend}>
+                <defs>
+                  <linearGradient id="gradAtiv" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gradReun" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(142 76% 36%)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(142 76% 36%)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="dia" tickFormatter={(v) => { const d = new Date(v + 'T12:00:00'); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }); }} className="text-xs fill-muted-foreground" />
+                <YAxis className="text-xs fill-muted-foreground" />
+                <RechartsTooltip labelFormatter={(v) => new Date(v + 'T12:00:00').toLocaleDateString('pt-BR')} />
+                <Area type="monotone" dataKey="total_atividades" name="Atividades" stroke="hsl(var(--primary))" fill="url(#gradAtiv)" strokeWidth={2} />
+                <Area type="monotone" dataKey="total_reunioes" name="Reuniões" stroke="hsl(142 76% 36%)" fill="url(#gradReun)" strokeWidth={2} />
+                <Legend />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Conversion Funnel */}
+        <div className="rounded-lg border border-border bg-card p-5 space-y-3">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <Target className="h-4 w-4 text-success" />
+            Funil de Conversão
+          </h3>
+          <div className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={funnel} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis type="number" className="text-xs fill-muted-foreground" />
+                <YAxis dataKey="etapa" type="category" width={120} className="text-xs fill-muted-foreground" />
+                <RechartsTooltip />
+                <Bar dataKey="total" name="Leads" radius={[0, 4, 4, 0]}>
+                  {funnel.map((entry, index) => {
+                    const colors = ['hsl(var(--primary))', 'hsl(38 92% 50%)', 'hsl(142 76% 36%)', 'hsl(142 76% 26%)', 'hsl(var(--destructive))'];
+                    return <Cell key={entry.etapa} fill={colors[index % colors.length]} />;
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-3">
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <Trophy className="h-4 w-4 text-warning" />
