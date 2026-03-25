@@ -13,14 +13,100 @@ interface ResearchRequest {
 
 interface ResearchResult {
   possui_site: boolean;
-  url_site: string;
+  url_site: string | null;
   instagram_ativo: boolean;
-  url_instagram: string;
+  url_instagram: string | null;
   faz_anuncios: boolean;
   whatsapp_automacao: boolean;
   observacoes_sdr: string;
 }
 
+// ── 1. Sanitização do input ──────────────────────────────────────
+const TERMOS_REMOVER = [
+  'LTDA', 'ME', 'EPP', 'EIRELI', 'S\\.A\\.?', 'SA',
+  'CORRETORA DE IMOVEIS', 'CORRETORA DE IMÓVEIS',
+  'ADMINISTRADORA DE IMOVEIS', 'ADMINISTRADORA DE IMÓVEIS',
+  'ADMINISTRADORA', 'CONSULTORIA IMOBILIARIA',
+  'CONSULTORIA IMOBILIÁRIA', 'ASSESSORIA IMOBILIARIA',
+  'EMPREENDIMENTOS IMOBILIARIOS', 'NEGOCIOS IMOBILIARIOS',
+  'NEGÓCIOS IMOBILIÁRIOS', 'INTERMEDIACAO', 'INTERMEDIAÇÃO',
+  'SERVICOS', 'SERVIÇOS', 'GESTAO', 'GESTÃO',
+  'COMPRA E VENDA', 'COMPRA VENDA',
+];
+
+function sanitizarNome(razaoSocial: string, fantasia?: string): string {
+  // Prioriza fantasia se existir
+  const raw = (fantasia?.trim() || razaoSocial || '').trim();
+  if (!raw) return '';
+
+  const regex = new RegExp(`\\b(${TERMOS_REMOVER.join('|')})\\b`, 'gi');
+  return raw
+    .replace(regex, '')
+    .replace(/[.\-\/]+/g, ' ')   // pontuação residual
+    .replace(/\s{2,}/g, ' ')     // espaços duplos
+    .trim();
+}
+
+// ── 2. Tool definition para saída estruturada ────────────────────
+const RESEARCH_TOOL = {
+  type: 'function' as const,
+  function: {
+    name: 'report_research',
+    description: 'Retorna os dados de pesquisa encontrados sobre a empresa.',
+    parameters: {
+      type: 'object',
+      properties: {
+        url_site: {
+          type: ['string', 'null'],
+          description: 'URL completa do site oficial da empresa. null se não encontrado.',
+        },
+        url_instagram: {
+          type: ['string', 'null'],
+          description: 'URL completa do perfil do Instagram da empresa. null se não encontrado.',
+        },
+        faz_anuncios: {
+          type: 'boolean',
+          description: 'Se há evidência de anúncios pagos (Meta Ads, Google Ads).',
+        },
+        whatsapp_automacao: {
+          type: 'boolean',
+          description: 'Se há evidência clara de automação/bot no WhatsApp.',
+        },
+        observacoes: {
+          type: 'string',
+          description: 'Resumo breve (2-3 frases) do que foi encontrado.',
+        },
+      },
+      required: ['url_site', 'url_instagram', 'faz_anuncios', 'whatsapp_automacao', 'observacoes'],
+      additionalProperties: false,
+    },
+  },
+};
+
+// ── 3. Busca via Firecrawl ───────────────────────────────────────
+async function searchFirecrawl(
+  firecrawlKey: string,
+  query: string,
+  limit = 5,
+): Promise<any[]> {
+  try {
+    const res = await fetch('https://api.firecrawl.dev/v1/search', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${firecrawlKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query, limit, lang: 'pt-br', country: 'BR' }),
+    });
+    const data = await res.json();
+    return data?.data || [];
+  } catch (e) {
+    console.error('Firecrawl search error:', e);
+    return [];
+  }
+}
+
+// ── Handler principal ────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -28,142 +114,65 @@ Deno.serve(async (req) => {
 
   try {
     const { razao_social, fantasia, cidade, uf, cnae_descricao } = await req.json() as ResearchRequest;
-    const companyName = fantasia || razao_social;
 
-    if (!companyName) {
+    const nomeLimpo = sanitizarNome(razao_social, fantasia);
+    if (!nomeLimpo) {
       return new Response(
         JSON.stringify({ success: false, error: 'Nome da empresa é obrigatório' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
     const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
-    if (!firecrawlKey) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'FIRECRAWL_API_KEY não configurada' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const lovableKey = Deno.env.get('LOVABLE_API_KEY');
-    if (!lovableKey) {
+
+    if (!firecrawlKey || !lovableKey) {
       return new Response(
-        JSON.stringify({ success: false, error: 'LOVABLE_API_KEY não configurada' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: 'API keys não configuradas' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    console.log(`Researching: ${companyName} - ${cidade}/${uf}`);
+    console.log(`Researching: "${nomeLimpo}" — ${cidade}/${uf}`);
 
-    // Search for the company using Firecrawl
-    const searchQuery = `"${companyName}" ${cidade} ${uf} site instagram`;
-    console.log('Search query:', searchQuery);
+    // Buscas paralelas no Firecrawl
+    const [siteResults, instaResults, adsResults] = await Promise.all([
+      searchFirecrawl(firecrawlKey, `"${nomeLimpo}" ${cidade} ${uf} site oficial`, 8),
+      searchFirecrawl(firecrawlKey, `site:instagram.com "${nomeLimpo}" ${cidade}`, 5),
+      searchFirecrawl(firecrawlKey, `"${nomeLimpo}" facebook ads meta ads library`, 5),
+    ]);
 
-    const searchResponse = await fetch('https://api.firecrawl.dev/v1/search', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${firecrawlKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: searchQuery,
-        limit: 8,
-        scrapeOptions: { formats: ['markdown'] },
-      }),
-    });
+    const allResults = [...siteResults, ...instaResults, ...adsResults];
+    console.log('Total search results:', allResults.length);
 
-    const searchData = await searchResponse.json();
-    console.log('Search results count:', searchData?.data?.length || 0);
+    const searchSummary = allResults
+      .map((r: any, i: number) =>
+        `[${i + 1}] URL: ${r.url || 'N/A'}\nTitle: ${r.title || 'N/A'}\nDescription: ${r.description || 'N/A'}\nContent: ${(r.markdown || '').slice(0, 400)}`,
+      )
+      .join('\n---\n');
 
-    // Also search specifically for Instagram
-    const instaSearchResponse = await fetch('https://api.firecrawl.dev/v1/search', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${firecrawlKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: `"${companyName}" ${cidade} instagram.com`,
-        limit: 5,
-        lang: 'pt-br',
-        country: 'BR',
-      }),
-    });
+    // ── Chamada ao LLM com tool calling para saída estruturada ──
+    const systemPrompt = `Você é um pesquisador web especialista em inteligência de vendas B2B para o mercado imobiliário brasileiro.
 
-    const instaData = await instaSearchResponse.json();
+SUA ÚNICA FONTE DE VERDADE são os resultados de busca fornecidos pelo usuário. Você NÃO deve inventar, adivinhar ou inferir URLs.
 
-    // Also search for Meta Ads
-    const adsSearchResponse = await fetch('https://api.firecrawl.dev/v1/search', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${firecrawlKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: `"${companyName}" anúncio facebook ads meta ads`,
-        limit: 5,
-        lang: 'pt-br',
-        country: 'BR',
-      }),
-    });
+REGRAS ESTRITAS:
+- Para url_site: Encontre o domínio oficial da empresa nos resultados. IGNORE portais como Zap Imóveis, Viva Real, CNPJ Biz, Casa Mineira, Chaves na Mão, consultasocio.com, cnpj.info, econodata.com.br, speedio.com.br, guiamais.com.br, apontador.com.br, 123i.com.br, wimoveis.com.br.
+- Para url_instagram: Encontre uma URL do tipo instagram.com/perfil_da_empresa nos resultados. Deve ser o perfil oficial.
+- Se NÃO encontrar com certeza nos resultados, retorne null para o campo. NUNCA invente uma URL.
+- faz_anuncios: true somente se houver menção explícita a Meta Ads Library, Facebook Ads ou Google Ads nos resultados.
+- whatsapp_automacao: true somente com evidência clara de bot/automação.
 
-    const adsData = await adsSearchResponse.json();
+Chame a função report_research com os dados encontrados.`;
 
-    // Combine all search results for AI analysis
-    const allResults = [
-      ...(searchData?.data || []),
-      ...(instaData?.data || []),
-      ...(adsData?.data || []),
-    ];
+    const userPrompt = `Pesquise os dados da seguinte empresa nos resultados abaixo:
 
-    const searchSummary = allResults.map((r: any, i: number) => 
-      `[${i + 1}] URL: ${r.url || 'N/A'}\nTitle: ${r.title || 'N/A'}\nDescription: ${r.description || 'N/A'}\nContent: ${(r.markdown || '').slice(0, 500)}`
-    ).join('\n\n---\n\n');
+Empresa: ${nomeLimpo}
+Cidade/UF: ${cidade} - ${uf}
+Segmento: ${cnae_descricao || 'Imobiliária'}
 
-    // Use AI to analyze the search results
-    const aiPrompt = `Você é um pesquisador especialista em Inteligência de Vendas B2B. Sua missão é enriquecer o cadastro de uma imobiliária encontrando EXATAMENTE a sua URL do Site Oficial e a sua URL do Instagram.
-
-Dados da empresa para pesquisar:
-- Razão Social: ${razao_social}
-- Nome Fantasia: ${fantasia || 'N/A'}
-- Cidade/Estado: ${cidade} - ${uf}
-- Segmento: ${cnae_descricao}
-
-RESULTADOS DA PESQUISA (use estes dados para sua análise):
-${searchSummary || 'Nenhum resultado encontrado.'}
-
-INSTRUÇÕES DE ANÁLISE (Siga rigorosamente):
-
-1. SITE OFICIAL:
-- Procure nos resultados um domínio que pareça ser o site oficial da empresa (ex: www.imobiliariax.com.br).
-- IGNORE diretórios como Zap Imóveis, Viva Real, CNPJ Biz, Casa Mineira, Chaves na Mão, consultasocio.com, cnpj.info, econodata.com.br, speedio.com.br.
-- Só marque possui_site=true se encontrar o domínio oficial real da empresa.
-
-2. INSTAGRAM:
-- Procure nos resultados URLs do instagram.com que sejam o perfil oficial da empresa.
-- O resultado deve ser o perfil oficial (ex: https://instagram.com/imobiliariax).
-
-3. ANÚNCIOS:
-- Verifique se há menção a Facebook Ads, Meta Ads Library, Google Ads nos resultados.
-
-4. WHATSAPP BOT:
-- Só marque true se houver evidência clara de automação/bot no WhatsApp.
-
-REGRAS DE RETORNO:
-- Você é OBRIGADO a tentar encontrar OS DOIS (Site e Instagram). Não pare se encontrar apenas um.
-- Se não encontrar um deles com 100% de certeza, retorne false/vazio para aquele campo específico, mas continue procurando o outro.
-- Nas observações, escreva um resumo breve (2-3 frases) do que encontrou.
-
-Responda EXCLUSIVAMENTE com um JSON válido neste formato:
-{
-  "possui_site": true/false,
-  "url_site": "URL completa do site ou vazio",
-  "instagram_ativo": true/false,
-  "url_instagram": "URL completa do instagram ou vazio",
-  "faz_anuncios": true/false,
-  "whatsapp_automacao": false,
-  "observacoes_sdr": "Resumo breve do que foi encontrado na pesquisa"
-}`;
+RESULTADOS DA BUSCA:
+${searchSummary || 'Nenhum resultado encontrado.'}`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -174,8 +183,11 @@ Responda EXCLUSIVAMENTE com um JSON válido neste formato:
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          { role: 'user', content: aiPrompt }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
         ],
+        tools: [RESEARCH_TOOL],
+        tool_choice: { type: 'function', function: { name: 'report_research' } },
       }),
     });
 
@@ -186,28 +198,37 @@ Responda EXCLUSIVAMENTE com um JSON válido neste formato:
     }
 
     const aiData = await aiResponse.json();
-    const aiContent = aiData.choices?.[0]?.message?.content || '';
-    console.log('AI response:', aiContent.slice(0, 200));
 
-    // Parse the JSON from AI response
-    const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('AI não retornou JSON válido');
+    // Extrair argumentos do tool call
+    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall || toolCall.function.name !== 'report_research') {
+      console.error('AI did not call the expected tool. Response:', JSON.stringify(aiData.choices?.[0]?.message));
+      throw new Error('IA não retornou dados estruturados via tool call');
     }
 
-    const result: ResearchResult = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(toolCall.function.arguments);
+    console.log('Parsed tool result:', JSON.stringify(parsed));
+
+    const result: ResearchResult = {
+      possui_site: !!parsed.url_site,
+      url_site: parsed.url_site || '',
+      instagram_ativo: !!parsed.url_instagram,
+      url_instagram: parsed.url_instagram || '',
+      faz_anuncios: !!parsed.faz_anuncios,
+      whatsapp_automacao: !!parsed.whatsapp_automacao,
+      observacoes_sdr: parsed.observacoes || '',
+    };
 
     return new Response(
       JSON.stringify({ success: true, data: result }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
-
   } catch (error) {
     console.error('Auto-research error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
     return new Response(
       JSON.stringify({ success: false, error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 });
