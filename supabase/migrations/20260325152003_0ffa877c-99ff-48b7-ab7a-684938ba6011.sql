@@ -1,0 +1,1 @@
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS whatsapp_automacao boolean NOT NULL DEFAULT false;

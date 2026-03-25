@@ -49,6 +49,7 @@ export type Database = {
           url_instagram: string | null
           url_site: string | null
           valor_negocio_estimado: number | null
+          whatsapp_automacao: boolean
         }
         Insert: {
           bairro?: string | null
@@ -84,6 +85,7 @@ export type Database = {
           url_instagram?: string | null
           url_site?: string | null
           valor_negocio_estimado?: number | null
+          whatsapp_automacao?: boolean
         }
         Update: {
           bairro?: string | null
@@ -119,6 +121,7 @@ export type Database = {
           url_instagram?: string | null
           url_site?: string | null
           valor_negocio_estimado?: number | null
+          whatsapp_automacao?: boolean
         }
         Relationships: []
       }
