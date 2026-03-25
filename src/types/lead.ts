@@ -39,6 +39,7 @@ export interface Lead {
   instagram_ativo: boolean;
   url_instagram: string;
   faz_anuncios: boolean;
+  whatsapp_automacao: boolean;
   observacoes_sdr: string;
   estagio_funil: EstagioFunil | null;
   valor_negocio_estimado: number | null;

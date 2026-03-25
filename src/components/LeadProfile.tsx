@@ -197,6 +197,12 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                   <Switch id="ads" checked={current.faz_anuncios} onCheckedChange={(v) => setField("faz_anuncios", v)} />
                 </div>
 
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="bot" className="flex items-center gap-2"><Bot className="h-4 w-4" /> WhatsApp tem Automação (Bot)?</Label>
+                  <Switch id="bot" checked={current.whatsapp_automacao} onCheckedChange={(v) => setField("whatsapp_automacao", v)} />
+                </div>
+                <p className="text-xs text-muted-foreground -mt-2">Marque se o primeiro atendimento é feito por robô.</p>
+
                 <Separator />
 
                 <div className="space-y-2">

@@ -198,6 +198,14 @@ export default function Index() {
                           <TableCell><StatusBadge status={lead.status_sdr} /></TableCell>
                           <TableCell className="font-medium">{lead.fantasia || lead.razao_social}</TableCell>
                           <TableCell className="text-muted-foreground font-mono text-xs">{lead.cnpj}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            <span className="inline-flex items-center gap-1.5">
+                              {lead.celular1 || "—"}
+                              {lead.whatsapp_automacao && (
+                                <Bot className="h-3.5 w-3.5 text-warning" title="WhatsApp com automação (Bot)" />
+                              )}
+                            </span>
+                          </TableCell>
                           <TableCell className="text-muted-foreground">{lead.cidade}/{lead.uf}</TableCell>
                         </TableRow>
                       ))}
