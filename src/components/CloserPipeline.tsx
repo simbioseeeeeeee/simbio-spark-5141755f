@@ -114,6 +114,49 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Realtime: listen for leads moving to "Reunião Agendada"
+  useEffect(() => {
+    const channel = supabase
+      .channel('closer-pipeline-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'leads',
+          filter: 'status_sdr=eq.Reunião Agendada',
+        },
+        (payload) => {
+          const newLead = payload.new as any;
+          const oldLead = payload.old as any;
+
+          // Only notify if the lead just moved to "Reunião Agendada"
+          if (oldLead?.status_sdr !== 'Reunião Agendada' && newLead?.status_sdr === 'Reunião Agendada') {
+            const nome = newLead.fantasia || newLead.razao_social || 'Lead';
+            toast({
+              title: "🔔 Nova Reunião Agendada!",
+              description: `${nome} (${newLead.cidade || '—'}) foi movido para o pipeline.`,
+            });
+
+            // Play notification sound
+            try {
+              const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbsGczJjmEw9jUhkMtPXmv0NmcUjhHcKXM2qpfO0pvn8XYsmY+TGueyNS1d0NMdJ7B0bVxREhribrSuXlJUHWXvM+5eElQdJa7z7lwSlF2mL3PuXNLUnabvs+5c0pQdJe80LpyS1J2mLzPuXBKUHSXvM+5');
+              audio.volume = 0.3;
+              audio.play().catch(() => {});
+            } catch {}
+
+            // Refresh the pipeline data
+            loadData();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadData]);
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || !active) return;
