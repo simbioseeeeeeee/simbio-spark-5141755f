@@ -30,7 +30,11 @@ import {
   Pie, RadialBarChart, RadialBar,
 } from "recharts";
 
-function KpiCard({ label, value, icon: Icon, color, prefix }: { label: string; value: string | number; icon: any; color: string; prefix?: string }) {
+function KpiCard({ label, value, icon: Icon, color, prefix, target }: { label: string; value: string | number; icon: any; color: string; prefix?: string; target?: number }) {
+  const numericValue = typeof value === "number" ? value : parseFloat(String(value).replace(/[^0-9.-]/g, "")) || 0;
+  const pct = target && target > 0 ? Math.min((numericValue / target) * 100, 100) : null;
+  const isAboveTarget = target ? numericValue >= target : false;
+
   return (
     <Card className="border-border">
       <CardContent className="p-5 space-y-2">
@@ -41,6 +45,17 @@ function KpiCard({ label, value, icon: Icon, color, prefix }: { label: string; v
           </div>
         </div>
         <p className="text-3xl font-bold">{prefix}{value}</p>
+        {target !== undefined && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-muted-foreground">Meta: {prefix}{target.toLocaleString("pt-BR")}</span>
+              <span className={`font-semibold ${isAboveTarget ? "text-success" : "text-warning"}`}>
+                {pct !== null ? `${pct.toFixed(0)}%` : "—"}
+              </span>
+            </div>
+            <Progress value={pct ?? 0} className="h-1.5" />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
