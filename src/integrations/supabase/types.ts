@@ -234,7 +234,7 @@ export type Database = {
         }[]
       }
       get_cadencia_hoje: {
-        Args: { p_cidade: string }
+        Args: { p_cidade?: string }
         Returns: {
           bairro: string | null
           celular1: string | null
@@ -292,7 +292,7 @@ export type Database = {
         }[]
       }
       get_daily_metrics: {
-        Args: { p_cidade: string }
+        Args: { p_cidade?: string }
         Returns: {
           conexoes_hoje: number
           pesquisas_hoje: number
