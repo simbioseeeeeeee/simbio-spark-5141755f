@@ -34,7 +34,7 @@ export function ActivityModal({ lead, open, onClose, onDone, userId }: Props) {
     }
     setSaving(true);
     try {
-      const updated = await registrarAtividade(lead, tipo, resultado, nota);
+      const updated = await registrarAtividade(lead, tipo, resultado, nota, userId);
       setResultado("");
       setNota("");
       onDone(updated);
