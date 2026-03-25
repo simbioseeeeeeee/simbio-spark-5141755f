@@ -209,23 +209,26 @@ function AnalyticsView({ territorio }: { territorio: string }) {
 
       {/* KPI Row */}
       {(() => {
-        // Daily targets — scale by period
-        const DAILY_TARGETS = { leads: 5, atividades: 30, reunioes: 3, fechamentos: 1, pipeline: 10000 };
         const mult = period === 1 ? 1 : period;
         const t = {
-          leads: DAILY_TARGETS.leads * mult,
-          atividades: DAILY_TARGETS.atividades * mult,
-          reunioes: DAILY_TARGETS.reunioes * mult,
-          fechamentos: DAILY_TARGETS.fechamentos * mult,
-          pipeline: DAILY_TARGETS.pipeline * mult,
+          leads: dailyTargets.leads * mult,
+          atividades: dailyTargets.atividades * mult,
+          reunioes: dailyTargets.reunioes * mult,
+          fechamentos: dailyTargets.fechamentos * mult,
+          pipeline: dailyTargets.pipeline * mult,
         };
         return (
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-            <KpiCard label="Leads Qualificados" value={Number(analytics.total_leads_qualificados)} icon={Users} color="bg-primary/10 text-primary" target={t.leads} />
-            <KpiCard label="Atividades" value={Number(analytics.total_atividades)} icon={Activity} color="bg-warning/10 text-warning" target={t.atividades} />
-            <KpiCard label="Reuniões" value={Number(analytics.total_reunioes)} icon={CalendarCheck} color="bg-success/10 text-success" target={t.reunioes} />
-            <KpiCard label="Fechamentos" value={Number(analytics.total_fechamentos)} icon={Target} color="bg-success/10 text-success" target={t.fechamentos} />
-            <KpiCard label="Pipeline (R$)" value={formatCurrency(Number(analytics.valor_pipeline))} icon={DollarSign} color="bg-primary/10 text-primary" prefix="" target={t.pipeline} />
+          <div className="space-y-2">
+            <div className="flex items-center justify-end">
+              <TargetsEditor targets={dailyTargets} onSave={(newT) => { setDailyTargets(newT); saveTargets(newT); }} />
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+              <KpiCard label="Leads Qualificados" value={Number(analytics.total_leads_qualificados)} icon={Users} color="bg-primary/10 text-primary" target={t.leads} />
+              <KpiCard label="Atividades" value={Number(analytics.total_atividades)} icon={Activity} color="bg-warning/10 text-warning" target={t.atividades} />
+              <KpiCard label="Reuniões" value={Number(analytics.total_reunioes)} icon={CalendarCheck} color="bg-success/10 text-success" target={t.reunioes} />
+              <KpiCard label="Fechamentos" value={Number(analytics.total_fechamentos)} icon={Target} color="bg-success/10 text-success" target={t.fechamentos} />
+              <KpiCard label="Pipeline (R$)" value={formatCurrency(Number(analytics.valor_pipeline))} icon={DollarSign} color="bg-primary/10 text-primary" prefix="" target={t.pipeline} />
+            </div>
           </div>
         );
       })()}
