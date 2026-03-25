@@ -198,8 +198,7 @@ function TargetsEditor({ targets, onSave }: { targets: DailyTargets; onSave: (t:
   );
 }
 
-
-  const [period, setPeriod] = useState<number>(7);
+function AnalyticsView({ territorio }: { territorio: string }) {
   const [analytics, setAnalytics] = useState<ManagerAnalytics | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [trend, setTrend] = useState<ActivityTrendEntry[]>([]);
