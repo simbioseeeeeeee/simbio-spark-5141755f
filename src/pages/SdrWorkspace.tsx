@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Lead, CADENCE_STEPS } from "@/types/lead";
-import { getCadenciaHoje, getDailyMetrics, DailyMetrics } from "@/store/leads-store";
+import { getCadenciaHoje, getCadenciaConcluidasHoje, getCadenciaAmanha, getDailyMetrics, DailyMetrics } from "@/store/leads-store";
 import { useAuth } from "@/contexts/AuthContext";
 import { ActivityModal } from "@/components/ActivityModal";
 import { LeadProfile } from "@/components/LeadProfile";
@@ -10,7 +10,8 @@ import { NewLeadModal } from "@/components/NewLeadModal";
 import { AppLayout } from "@/components/AppLayout";
 import { TerritorySelector } from "@/components/TerritorySelector";
 import { Button } from "@/components/ui/button";
-import { Crosshair, Search, Phone, MessageSquare, CalendarCheck, Loader2, Bot } from "lucide-react";
+import { Crosshair, Search, Phone, MessageSquare, CalendarCheck, Loader2, Bot, CheckCircle2, CalendarClock } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "react-router-dom";
 
@@ -40,16 +41,27 @@ function SdrFocoView() {
   const { user } = useAuth();
   const [metrics, setMetrics] = useState<DailyMetrics>({ pesquisas_hoje: 0, tentativas_hoje: 0, conexoes_hoje: 0, reunioes_hoje: 0 });
   const [cadencia, setCadencia] = useState<Lead[]>([]);
+  const [concluidas, setConcluidas] = useState<Lead[]>([]);
+  const [amanha, setAmanha] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
+  const [showConcluidas, setShowConcluidas] = useState(false);
+  const [showAmanha, setShowAmanha] = useState(false);
 
   const loadFocoData = useCallback(async () => {
     setLoading(true);
     try {
-      const [m, c] = await Promise.all([getDailyMetrics(), getCadenciaHoje()]);
+      const [m, c, done, tomorrow] = await Promise.all([
+        getDailyMetrics(),
+        getCadenciaHoje(),
+        getCadenciaConcluidasHoje(),
+        getCadenciaAmanha(),
+      ]);
       setMetrics(m);
       setCadencia(c);
+      setConcluidas(done);
+      setAmanha(tomorrow);
     } catch (err: any) {
       toast({ title: "Erro ao carregar dados", description: err.message, variant: "destructive" });
     } finally {
@@ -130,6 +142,70 @@ function SdrFocoView() {
             );
           })}
         </div>
+      )}
+
+      {/* Completed Today */}
+      {!loading && concluidas.length > 0 && (
+        <Collapsible open={showConcluidas} onOpenChange={setShowConcluidas}>
+          <CollapsibleTrigger className="flex items-center gap-2 w-full text-left py-2">
+            <CheckCircle2 className="h-4 w-4 text-success" />
+            <span className="text-sm font-semibold text-foreground">Concluídas Hoje</span>
+            <span className="text-xs text-muted-foreground">({concluidas.length})</span>
+            <span className="text-xs text-muted-foreground ml-auto">{showConcluidas ? "▾" : "▸"}</span>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-2">
+            {concluidas.map((lead) => {
+              const step = CADENCE_STEPS[lead.dia_cadencia] || `Passo ${lead.dia_cadencia + 1}`;
+              return (
+                <div key={lead.id} className="rounded-lg border border-border bg-card/50 p-3 flex items-center gap-3 opacity-70">
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedLead(lead)}>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
+                      <span className="font-medium text-sm truncate">{lead.fantasia || lead.razao_social}</span>
+                      <ScoreBadge score={lead.lead_score} />
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-muted-foreground">Dia {lead.dia_cadencia}: {step}</span>
+                      <span className="text-xs text-muted-foreground">· {lead.cidade}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
+      {/* Tomorrow's Tasks */}
+      {!loading && amanha.length > 0 && (
+        <Collapsible open={showAmanha} onOpenChange={setShowAmanha}>
+          <CollapsibleTrigger className="flex items-center gap-2 w-full text-left py-2">
+            <CalendarClock className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold text-foreground">Amanhã</span>
+            <span className="text-xs text-muted-foreground">({amanha.length})</span>
+            <span className="text-xs text-muted-foreground ml-auto">{showAmanha ? "▾" : "▸"}</span>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-2">
+            {amanha.map((lead) => {
+              const step = CADENCE_STEPS[lead.dia_cadencia] || `Passo ${lead.dia_cadencia + 1}`;
+              return (
+                <div key={lead.id} className="rounded-lg border border-dashed border-border bg-card/30 p-3 flex items-center gap-3">
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedLead(lead)}>
+                    <div className="flex items-center gap-2">
+                      <CalendarClock className="h-3.5 w-3.5 text-primary shrink-0" />
+                      <span className="font-medium text-sm truncate">{lead.fantasia || lead.razao_social}</span>
+                      <ScoreBadge score={lead.lead_score} />
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-primary">Dia {lead.dia_cadencia}: {step}</span>
+                      <span className="text-xs text-muted-foreground">· {lead.cidade}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </CollapsibleContent>
+        </Collapsible>
       )}
 
       <LeadProfile lead={selectedLead} open={!!selectedLead} onClose={() => setSelectedLead(null)} onSaved={handleLeadSaved} />

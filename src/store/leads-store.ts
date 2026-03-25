@@ -86,6 +86,24 @@ export async function getCadenciaHoje(cidade?: string): Promise<Lead[]> {
   return (data || []).map(rowToLead);
 }
 
+// ─── Cadence (Completed Today) ───────────────────────────────
+export async function getCadenciaConcluidasHoje(cidade?: string): Promise<Lead[]> {
+  const params: any = {};
+  if (cidade) params.p_cidade = cidade;
+  const { data, error } = await supabase.rpc("get_cadencia_concluidas_hoje" as any, params);
+  if (error) throw error;
+  return (data || []).map(rowToLead);
+}
+
+// ─── Cadence (Tomorrow) ─────────────────────────────────────
+export async function getCadenciaAmanha(cidade?: string): Promise<Lead[]> {
+  const params: any = {};
+  if (cidade) params.p_cidade = cidade;
+  const { data, error } = await supabase.rpc("get_cadencia_amanha" as any, params);
+  if (error) throw error;
+  return (data || []).map(rowToLead);
+}
+
 // ─── Activities ──────────────────────────────────────────────
 export async function registrarAtividade(
   lead: Lead,

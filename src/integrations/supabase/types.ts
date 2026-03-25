@@ -233,6 +233,108 @@ export type Database = {
           total_reunioes: number
         }[]
       }
+      get_cadencia_amanha: {
+        Args: { p_cidade?: string }
+        Returns: {
+          bairro: string | null
+          celular1: string | null
+          celular2: string | null
+          cep: string | null
+          cidade: string | null
+          cnae_descricao: string | null
+          cnpj: string | null
+          complemento: string | null
+          created_at: string
+          data_abertura: string | null
+          data_proximo_passo: string | null
+          dia_cadencia: number
+          email1: string | null
+          email2: string | null
+          estagio_funil: string | null
+          fantasia: string | null
+          faz_anuncios: boolean
+          id: string
+          instagram_ativo: boolean
+          lead_score: number | null
+          logradouro: string | null
+          numero: string | null
+          observacoes_closer: string | null
+          observacoes_sdr: string | null
+          owner_id: string | null
+          pesquisa_realizada: boolean
+          possui_site: boolean
+          razao_social: string | null
+          sdr_id: string | null
+          situacao: string | null
+          socios: Json | null
+          status_cadencia: string
+          status_sdr: string
+          telefone1: string | null
+          telefone2: string | null
+          uf: string | null
+          url_instagram: string | null
+          url_site: string | null
+          valor_negocio_estimado: number | null
+          whatsapp_automacao: boolean
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "leads"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      get_cadencia_concluidas_hoje: {
+        Args: { p_cidade?: string }
+        Returns: {
+          bairro: string | null
+          celular1: string | null
+          celular2: string | null
+          cep: string | null
+          cidade: string | null
+          cnae_descricao: string | null
+          cnpj: string | null
+          complemento: string | null
+          created_at: string
+          data_abertura: string | null
+          data_proximo_passo: string | null
+          dia_cadencia: number
+          email1: string | null
+          email2: string | null
+          estagio_funil: string | null
+          fantasia: string | null
+          faz_anuncios: boolean
+          id: string
+          instagram_ativo: boolean
+          lead_score: number | null
+          logradouro: string | null
+          numero: string | null
+          observacoes_closer: string | null
+          observacoes_sdr: string | null
+          owner_id: string | null
+          pesquisa_realizada: boolean
+          possui_site: boolean
+          razao_social: string | null
+          sdr_id: string | null
+          situacao: string | null
+          socios: Json | null
+          status_cadencia: string
+          status_sdr: string
+          telefone1: string | null
+          telefone2: string | null
+          uf: string | null
+          url_instagram: string | null
+          url_site: string | null
+          valor_negocio_estimado: number | null
+          whatsapp_automacao: boolean
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "leads"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_cadencia_hoje: {
         Args: { p_cidade?: string }
         Returns: {
