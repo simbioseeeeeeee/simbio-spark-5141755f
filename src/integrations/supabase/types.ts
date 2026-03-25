@@ -225,6 +225,14 @@ export type Database = {
           uf: string
         }[]
       }
+      get_activity_trend: {
+        Args: { p_cidade?: string; p_days?: number }
+        Returns: {
+          dia: string
+          total_atividades: number
+          total_reunioes: number
+        }[]
+      }
       get_cadencia_hoje: {
         Args: { p_cidade: string }
         Returns: {
@@ -275,6 +283,13 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      get_conversion_funnel: {
+        Args: { p_cidade?: string }
+        Returns: {
+          etapa: string
+          total: number
+        }[]
       }
       get_daily_metrics: {
         Args: { p_cidade: string }

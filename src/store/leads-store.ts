@@ -325,3 +325,40 @@ export async function getLeaderboard(cidade: string | null, days: number): Promi
   if (error) throw error;
   return (data || []) as LeaderboardEntry[];
 }
+
+// ─── Activity Trend (Charts) ────────────────────────────────
+export interface ActivityTrendEntry {
+  dia: string;
+  total_atividades: number;
+  total_reunioes: number;
+}
+
+export async function getActivityTrend(cidade: string | null, days: number): Promise<ActivityTrendEntry[]> {
+  const { data, error } = await supabase.rpc("get_activity_trend" as any, {
+    p_cidade: cidade,
+    p_days: days,
+  });
+  if (error) throw error;
+  return (data || []).map((r: any) => ({
+    dia: r.dia,
+    total_atividades: Number(r.total_atividades) || 0,
+    total_reunioes: Number(r.total_reunioes) || 0,
+  }));
+}
+
+// ─── Conversion Funnel ──────────────────────────────────────
+export interface FunnelEntry {
+  etapa: string;
+  total: number;
+}
+
+export async function getConversionFunnel(cidade: string | null): Promise<FunnelEntry[]> {
+  const { data, error } = await supabase.rpc("get_conversion_funnel" as any, {
+    p_cidade: cidade,
+  });
+  if (error) throw error;
+  return (data || []).map((r: any) => ({
+    etapa: r.etapa,
+    total: Number(r.total) || 0,
+  }));
+}
