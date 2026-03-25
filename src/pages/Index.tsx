@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Lead, LeadStatus, STATUS_OPTIONS } from "@/types/lead";
-import { getLeadsPaginated, getStatusCounts, LeadsResult } from "@/store/leads-store";
+import { getLeadsPaginated, getStatusCounts, getDistinctUFs, getDistinctCidades, LeadsResult } from "@/store/leads-store";
 import { StatusBadge } from "@/components/StatusBadge";
 import { LeadProfile } from "@/components/LeadProfile";
 import { KanbanBoard } from "@/components/KanbanBoard";
