@@ -69,21 +69,15 @@ export default function Login() {
     setError("");
     setSubmitting(true);
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) throw authError;
-      
-      // Fetch role directly and navigate — don't wait for onAuthStateChange
-      if (data.user) {
-        const { data: roleData } = await supabase.rpc("get_user_role", { _user_id: data.user.id });
-        const userRole = roleData as string;
-        if (userRole === "sdr") navigate("/sdr", { replace: true });
-        else if (userRole === "closer") navigate("/closer", { replace: true });
-        else if (userRole === "manager") navigate("/manager", { replace: true });
-        else navigate("/", { replace: true });
-      }
+      // AuthContext's onAuthStateChange will set user+role → triggers redirect via the if(user && role) check above
+      // Use a hard redirect as fallback after a short wait
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 3000);
     } catch (err: any) {
       setError(err.message === "Invalid login credentials" ? "Email ou senha incorretos." : err.message);
-    } finally {
       setSubmitting(false);
     }
   };
