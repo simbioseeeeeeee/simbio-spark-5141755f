@@ -139,15 +139,18 @@ export default function Index() {
                 </div>
 
                 {/* Task List Header */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <Crosshair className="h-4 w-4 text-primary" />
                     Foco de Hoje — {territorio}
                     <span className="text-muted-foreground font-normal">({cadencia.length} leads)</span>
                   </h2>
-                  <Button variant="ghost" size="sm" onClick={loadFocoData} disabled={loading}>
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <BatchResearch cidade={territorio} onComplete={loadFocoData} />
+                    <Button variant="ghost" size="sm" onClick={loadFocoData} disabled={loading}>
+                      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Cadence Task List */}
