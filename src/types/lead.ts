@@ -2,6 +2,9 @@ export type LeadStatus = "A Contatar" | "Em Qualificação" | "Reunião Agendada
 
 export type EstagioFunil = "Reunião Agendada" | "Reunião Realizada" | "Proposta Enviada" | "Em Negociação" | "Fechado Ganho" | "Fechado Perdido";
 
+export type TipoAtividade = "WhatsApp" | "Ligação" | "Email" | "Pesquisa" | "Visita";
+export type ResultadoAtividade = "Conectado" | "Atendeu" | "Respondeu" | "Não Atendeu" | "Caixa Postal" | "Sem Resposta" | "Agendou Reunião" | "Recusou" | "Pesquisa Concluída";
+
 export interface Socio {
   nome: string;
   telefone1?: string;
@@ -40,13 +43,24 @@ export interface Lead {
   url_instagram: string;
   faz_anuncios: boolean;
   whatsapp_automacao: boolean;
-  pesquisa_realizada: boolean;
-  lead_score: number | null;
   observacoes_sdr: string;
   estagio_funil: EstagioFunil | null;
   valor_negocio_estimado: number | null;
   data_proximo_passo: string | null;
   observacoes_closer: string;
+  pesquisa_realizada: boolean;
+  lead_score: number | null;
+  dia_cadencia: number;
+  status_cadencia: string;
+  created_at: string;
+}
+
+export interface Atividade {
+  id: string;
+  lead_id: string;
+  tipo_atividade: TipoAtividade;
+  resultado: ResultadoAtividade;
+  nota: string;
   created_at: string;
 }
 
@@ -66,6 +80,13 @@ export const ESTAGIO_FUNIL_OPTIONS: EstagioFunil[] = [
   "Fechado Perdido",
 ];
 
+export const TIPO_ATIVIDADE_OPTIONS: TipoAtividade[] = ["WhatsApp", "Ligação", "Email", "Pesquisa", "Visita"];
+
+export const RESULTADO_OPTIONS: ResultadoAtividade[] = [
+  "Conectado", "Atendeu", "Respondeu", "Não Atendeu",
+  "Caixa Postal", "Sem Resposta", "Agendou Reunião", "Recusou", "Pesquisa Concluída",
+];
+
 export const STATUS_COLORS: Record<LeadStatus, string> = {
   "A Contatar": "bg-muted text-muted-foreground",
   "Em Qualificação": "bg-warning/15 text-warning border border-warning/30",
@@ -81,3 +102,31 @@ export const ESTAGIO_COLORS: Record<EstagioFunil, string> = {
   "Fechado Ganho": "bg-success/15 text-success",
   "Fechado Perdido": "bg-destructive/15 text-destructive",
 };
+
+// Cadence step definitions (day -> action description)
+export const CADENCE_STEPS: Record<number, string> = {
+  0: "Pesquisar Lead",
+  1: "Enviar WhatsApp #1",
+  2: "Ligar para o Lead",
+  3: "Enviar WhatsApp #2",
+  4: "Ligar novamente",
+  5: "Enviar Email",
+  6: "WhatsApp de Follow-up",
+  7: "Ligar com abordagem diferente",
+  8: "WhatsApp Final",
+  9: "Última tentativa (Ligar)",
+};
+
+// Gap between cadence steps (in days)
+export const CADENCE_GAPS: Record<number, number> = {
+  0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 2, 7: 3, 8: 2, 9: 3,
+};
+
+export function calculateScore(lead: Pick<Lead, 'possui_site' | 'instagram_ativo' | 'faz_anuncios' | 'whatsapp_automacao'>): number {
+  let score = 0;
+  if (lead.possui_site) score += 30;
+  if (lead.instagram_ativo) score += 20;
+  if (lead.faz_anuncios) score += 40;
+  if (lead.whatsapp_automacao) score += 10;
+  return Math.min(score, 100);
+}
