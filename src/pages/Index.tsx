@@ -9,8 +9,20 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Search, Users, List, Columns3, Loader2, ChevronLeft, ChevronRight, Bot } from "lucide-react";
+import { Building2, Search, Users, List, Columns3, Loader2, ChevronLeft, ChevronRight, Bot, CheckCircle2, ArrowUpDown } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+
+function ScoreCell({ score }: { score: number | null }) {
+  if (score === null || score === undefined) return <span className="text-muted-foreground text-xs">—</span>;
+  const color = score >= 70
+    ? "bg-success/15 text-success border-success/30"
+    : score >= 40
+      ? "bg-warning/15 text-warning border-warning/30"
+      : "bg-destructive/15 text-destructive border-destructive/30";
+  return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold border ${color}`}>{score}</span>;
+}
+
+type PesquisaFilter = "todos" | "pesquisados" | "nao_pesquisados" | "qualificados";
 
 export default function Index() {
   const [result, setResult] = useState<LeadsResult>({ leads: [], total: 0, page: 0, pageSize: 50 });
@@ -20,6 +32,8 @@ export default function Index() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [ufFilter, setUfFilter] = useState<string>("all");
   const [cidadeFilter, setCidadeFilter] = useState<string>("all");
+  const [pesquisaFilter, setPesquisaFilter] = useState<PesquisaFilter>("todos");
+  const [sortByScore, setSortByScore] = useState(false);
   const [ufs, setUfs] = useState<string[]>([]);
   const [cidades, setCidades] = useState<string[]>([]);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -27,24 +41,15 @@ export default function Index() {
   const [loading, setLoading] = useState(true);
   const [counts, setCounts] = useState<Record<string, number>>({ all: 0 });
 
-  // Debounce search
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-      setPage(0);
-    }, 400);
+    const timer = setTimeout(() => { setDebouncedSearch(search); setPage(0); }, 400);
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Reset page on filter change
-  useEffect(() => { setPage(0); }, [statusFilter, ufFilter, cidadeFilter]);
+  useEffect(() => { setPage(0); }, [statusFilter, ufFilter, cidadeFilter, pesquisaFilter, sortByScore]);
 
-  // Load UFs on mount
-  useEffect(() => {
-    getDistinctUFs().then(setUfs).catch(() => {});
-  }, []);
+  useEffect(() => { getDistinctUFs().then(setUfs).catch(() => {}); }, []);
 
-  // Load cidades when UF changes
   useEffect(() => {
     setCidadeFilter("all");
     if (ufFilter !== "all") {
@@ -57,8 +62,13 @@ export default function Index() {
   const loadLeads = useCallback(async () => {
     setLoading(true);
     try {
+      const scoreFilter = pesquisaFilter === "qualificados" ? "qualificados" : undefined;
+      const pesqFilter = pesquisaFilter === "pesquisados" ? "pesquisados"
+        : pesquisaFilter === "nao_pesquisados" ? "nao_pesquisados"
+        : undefined;
+
       const [data, statusCounts] = await Promise.all([
-        getLeadsPaginated({ page, search: debouncedSearch, statusFilter, cidadeFilter, ufFilter }),
+        getLeadsPaginated({ page, search: debouncedSearch, statusFilter, cidadeFilter, ufFilter, pesquisaFilter: pesqFilter, scoreFilter, sortByScore }),
         getStatusCounts(),
       ]);
       setResult(data);
@@ -68,7 +78,7 @@ export default function Index() {
     } finally {
       setLoading(false);
     }
-  }, [page, debouncedSearch, statusFilter, ufFilter, cidadeFilter]);
+  }, [page, debouncedSearch, statusFilter, ufFilter, cidadeFilter, pesquisaFilter, sortByScore]);
 
   useEffect(() => { loadLeads(); }, [loadLeads]);
 
@@ -81,6 +91,13 @@ export default function Index() {
     }));
     setSelectedLead(updated);
   };
+
+  const quickFilters: { key: PesquisaFilter; label: string }[] = [
+    { key: "todos", label: "Todos" },
+    { key: "nao_pesquisados", label: "Não Pesquisados" },
+    { key: "pesquisados", label: "Já Pesquisados" },
+    { key: "qualificados", label: "Qualificados (≥60)" },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -122,6 +139,29 @@ export default function Index() {
 
         {view === "sdr" && (
           <>
+            {/* Quick Filter Pills */}
+            <div className="flex flex-wrap gap-2">
+              {quickFilters.map((f) => (
+                <Button
+                  key={f.key}
+                  variant={pesquisaFilter === f.key ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setPesquisaFilter(f.key)}
+                >
+                  {f.label}
+                </Button>
+              ))}
+              <Button
+                variant={sortByScore ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSortByScore(!sortByScore)}
+                className="ml-auto gap-1.5"
+              >
+                <ArrowUpDown className="h-3.5 w-3.5" />
+                {sortByScore ? "Ordenando por Score" : "Ordenar por Score"}
+              </Button>
+            </div>
+
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
               <div className="relative flex-1 min-w-[200px]">
@@ -181,11 +221,13 @@ export default function Index() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        <TableHead className="w-[180px]">Status</TableHead>
+                        <TableHead className="w-[40px]"></TableHead>
+                        <TableHead className="w-[160px]">Status</TableHead>
                         <TableHead>Razão Social</TableHead>
                         <TableHead className="w-[180px]">CNPJ</TableHead>
                         <TableHead className="w-[160px]">Celular</TableHead>
                         <TableHead className="w-[150px]">Cidade/UF</TableHead>
+                        <TableHead className="w-[80px] text-center">Score</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -195,6 +237,11 @@ export default function Index() {
                           className="cursor-pointer hover:bg-muted/50 transition-colors"
                           onClick={() => setSelectedLead(lead)}
                         >
+                          <TableCell className="px-2">
+                            {lead.pesquisa_realizada && (
+                              <CheckCircle2 className="h-4 w-4 text-success" title="Pesquisa realizada" />
+                            )}
+                          </TableCell>
                           <TableCell><StatusBadge status={lead.status_sdr} /></TableCell>
                           <TableCell className="font-medium">{lead.fantasia || lead.razao_social}</TableCell>
                           <TableCell className="text-muted-foreground font-mono text-xs">{lead.cnpj}</TableCell>
@@ -207,6 +254,7 @@ export default function Index() {
                             </span>
                           </TableCell>
                           <TableCell className="text-muted-foreground">{lead.cidade}/{lead.uf}</TableCell>
+                          <TableCell className="text-center"><ScoreCell score={lead.lead_score} /></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -218,23 +266,11 @@ export default function Index() {
                     Mostrando {page * result.pageSize + 1}–{Math.min((page + 1) * result.pageSize, result.total)} de {result.total} leads
                   </p>
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page === 0}
-                      onClick={() => setPage((p) => p - 1)}
-                    >
+                    <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
                       <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
                     </Button>
-                    <span className="text-sm text-muted-foreground">
-                      {page + 1} / {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={page >= totalPages - 1}
-                      onClick={() => setPage((p) => p + 1)}
-                    >
+                    <span className="text-sm text-muted-foreground">{page + 1} / {totalPages}</span>
+                    <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
                       Próximo <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                   </div>
