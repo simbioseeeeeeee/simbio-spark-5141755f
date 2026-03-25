@@ -71,11 +71,8 @@ export default function Login() {
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) throw authError;
-      // AuthContext's onAuthStateChange will set user+role → triggers redirect via the if(user && role) check above
-      // Use a hard redirect as fallback after a short wait
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 3000);
+      // Force a full page reload to "/" — Index.tsx will route based on role
+      window.location.replace("/");
     } catch (err: any) {
       setError(err.message === "Invalid login credentials" ? "Email ou senha incorretos." : err.message);
       setSubmitting(false);
