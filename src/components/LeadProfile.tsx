@@ -17,14 +17,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles } from "lucide-react";
 
-function calculateScore(lead: Lead): number {
-  let score = 0;
-  if (lead.possui_site) score += 30;
-  if (lead.instagram_ativo) score += 20;
-  if (lead.faz_anuncios) score += 40;
-  if (lead.whatsapp_automacao) score += 10;
-  return Math.min(score, 100);
-}
+// calculateScore is now imported from types/lead
 
 function ScoreBadge({ score }: { score: number }) {
   const color = score >= 70
