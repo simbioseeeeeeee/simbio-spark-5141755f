@@ -121,35 +121,49 @@ Deno.serve(async (req) => {
     ).join('\n\n---\n\n');
 
     // Use AI to analyze the search results
-    const aiPrompt = `Você é um analista de qualificação de leads B2B. Analise os resultados de pesquisa abaixo sobre a empresa "${companyName}" localizada em ${cidade}/${uf}, segmento: ${cnae_descricao}.
+    const aiPrompt = `Você é um pesquisador especialista em Inteligência de Vendas B2B. Sua missão é enriquecer o cadastro de uma imobiliária encontrando EXATAMENTE a sua URL do Site Oficial e a sua URL do Instagram.
 
-RESULTADOS DA PESQUISA:
+Dados da empresa para pesquisar:
+- Razão Social: ${razao_social}
+- Nome Fantasia: ${fantasia || 'N/A'}
+- Cidade/Estado: ${cidade} - ${uf}
+- Segmento: ${cnae_descricao}
+
+RESULTADOS DA PESQUISA (use estes dados para sua análise):
 ${searchSummary || 'Nenhum resultado encontrado.'}
 
-Com base nos resultados, determine:
-1. A empresa possui site próprio? Se sim, qual a URL?
-2. A empresa tem Instagram ativo? Se sim, qual a URL do perfil?
-3. A empresa faz anúncios online (Meta Ads, Google Ads)?
-4. O WhatsApp da empresa tem automação/bot?
+INSTRUÇÕES DE ANÁLISE (Siga rigorosamente):
 
-Responda EXCLUSIVAMENTE em JSON válido neste formato:
+1. SITE OFICIAL:
+- Procure nos resultados um domínio que pareça ser o site oficial da empresa (ex: www.imobiliariax.com.br).
+- IGNORE diretórios como Zap Imóveis, Viva Real, CNPJ Biz, Casa Mineira, Chaves na Mão, consultasocio.com, cnpj.info, econodata.com.br, speedio.com.br.
+- Só marque possui_site=true se encontrar o domínio oficial real da empresa.
+
+2. INSTAGRAM:
+- Procure nos resultados URLs do instagram.com que sejam o perfil oficial da empresa.
+- O resultado deve ser o perfil oficial (ex: https://instagram.com/imobiliariax).
+
+3. ANÚNCIOS:
+- Verifique se há menção a Facebook Ads, Meta Ads Library, Google Ads nos resultados.
+
+4. WHATSAPP BOT:
+- Só marque true se houver evidência clara de automação/bot no WhatsApp.
+
+REGRAS DE RETORNO:
+- Você é OBRIGADO a tentar encontrar OS DOIS (Site e Instagram). Não pare se encontrar apenas um.
+- Se não encontrar um deles com 100% de certeza, retorne false/vazio para aquele campo específico, mas continue procurando o outro.
+- Nas observações, escreva um resumo breve (2-3 frases) do que encontrou.
+
+Responda EXCLUSIVAMENTE com um JSON válido neste formato:
 {
   "possui_site": true/false,
-  "url_site": "URL do site ou vazio",
+  "url_site": "URL completa do site ou vazio",
   "instagram_ativo": true/false,
-  "url_instagram": "URL do Instagram ou vazio",
+  "url_instagram": "URL completa do instagram ou vazio",
   "faz_anuncios": true/false,
   "whatsapp_automacao": false,
-  "observacoes_sdr": "Resumo breve do que foi encontrado na pesquisa (2-3 frases)"
-}
-
-REGRAS:
-- Só marque como true se houver evidência clara nos resultados
-- Para site, procure URLs que pareçam ser o site oficial da empresa (não inclua links de diretórios como CNPJ.info, consultasocio.com, etc)
-- Para Instagram, procure URLs do instagram.com com o perfil da empresa
-- Para anúncios, procure menção a Facebook Ads, Meta Ads Library, Google Ads
-- whatsapp_automacao deve ser false a menos que haja evidência clara
-- Nas observações, explique brevemente o que encontrou`;
+  "observacoes_sdr": "Resumo breve do que foi encontrado na pesquisa"
+}`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
