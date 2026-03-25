@@ -151,7 +151,7 @@ REGRAS:
 - whatsapp_automacao deve ser false a menos que haja evidência clara
 - Nas observações, explique brevemente o que encontrou`;
 
-    const aiResponse = await fetch('https://llgmluxthgwmiwmdajvt.supabase.co/functions/v1/ai-gateway', {
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${lovableKey}`,
