@@ -176,7 +176,7 @@ export default function Index() {
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <KanbanBoard leads={leads} onSelectLead={setSelectedLead} />
+            <KanbanBoard leads={leads} onSelectLead={setSelectedLead} onLeadUpdated={handleSaved} />
           )
         )}
       </main>
