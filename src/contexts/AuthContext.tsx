@@ -32,6 +32,8 @@ async function clearStaleClientStateAndReload() {
     return false;
   }
 
+  // Only clear caches and service workers — NEVER clear localStorage/sessionStorage
+  // because that destroys the Supabase auth tokens and causes login loops
   try {
     if ("serviceWorker" in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations();
@@ -41,13 +43,6 @@ async function clearStaleClientStateAndReload() {
       const keys = await caches.keys();
       await Promise.all(keys.map((k) => caches.delete(k)));
     }
-  } catch {
-    // no-op
-  }
-
-  try {
-    localStorage.clear();
-    sessionStorage.clear();
   } catch {
     // no-op
   }
@@ -107,9 +102,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const stallTimeout = window.setTimeout(() => {
       if (!initializedRef.current) {
-        handlePotentialStall();
+        // Don't aggressively reset — just finalize loading to unblock the UI
+        console.warn("Auth initialization took too long, finalizing without reset");
+        finalizeInit();
       }
-    }, 5000);
+    }, 8000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       try {

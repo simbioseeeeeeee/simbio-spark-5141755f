@@ -131,6 +131,18 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
     if (!current) return;
     setSaving(true);
     try {
+      // Verify session is still valid before saving
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        // Try to refresh the token
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshData.session) {
+          toast({ title: "Sessão expirada", description: "Faça login novamente para continuar.", variant: "destructive" });
+          setSaving(false);
+          return;
+        }
+      }
+
       const toSave: Lead = {
         ...current,
         lead_score: calculateScore(current),
