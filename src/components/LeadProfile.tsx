@@ -14,7 +14,8 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/hooks/use-toast";
-import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles } from "lucide-react";
 
 function calculateScore(lead: Lead): number {
   let score = 0;
