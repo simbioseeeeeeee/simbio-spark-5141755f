@@ -91,7 +91,6 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
   );
 
   const loadData = useCallback(async () => {
-    if (!territorio) return;
     setLoading(true);
     try {
       const data = await getKanbanLeads(territorio);
