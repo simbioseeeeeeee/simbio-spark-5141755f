@@ -37,7 +37,22 @@ export default function Index() {
   }, [search]);
 
   // Reset page on filter change
-  useEffect(() => { setPage(0); }, [statusFilter]);
+  useEffect(() => { setPage(0); }, [statusFilter, ufFilter, cidadeFilter]);
+
+  // Load UFs on mount
+  useEffect(() => {
+    getDistinctUFs().then(setUfs).catch(() => {});
+  }, []);
+
+  // Load cidades when UF changes
+  useEffect(() => {
+    setCidadeFilter("all");
+    if (ufFilter !== "all") {
+      getDistinctCidades(ufFilter).then(setCidades).catch(() => {});
+    } else {
+      setCidades([]);
+    }
+  }, [ufFilter]);
 
   const loadLeads = useCallback(async () => {
     setLoading(true);
