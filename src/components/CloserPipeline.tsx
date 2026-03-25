@@ -1,10 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Lead, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, ESTAGIO_COLORS, Atividade } from "@/types/lead";
 import { getKanbanLeads, updateLead, getLeadAtividades } from "@/store/leads-store";
 import { supabase } from "@/integrations/supabase/client";
-import { DndContext, DragEndEvent, useDroppable, useDraggable, DragOverlay, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { Loader2, GripVertical, Bell } from "lucide-react";
+import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { PipelineCard } from "./closer/PipelineCard";
+import { PipelineColumn } from "./closer/PipelineColumn";
+import { PipelineFilters, PipelineFilterValues } from "./closer/PipelineFilters";
 
 interface Props {
   territorio?: string;
@@ -13,79 +16,15 @@ interface Props {
 
 const COLUMNS: EstagioFunil[] = ESTAGIO_FUNIL_OPTIONS;
 
-function DroppableColumn({ id, children, colorClass, count }: { id: string; children: React.ReactNode; colorClass: string; count: number }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
-  return (
-    <div className="w-[280px] shrink-0">
-      <div className={`rounded-t-lg px-3 py-2 flex items-center justify-between ${colorClass}`}>
-        <span className="text-sm font-semibold">{id}</span>
-        <span className="text-xs font-bold">{count}</span>
-      </div>
-      <div
-        ref={setNodeRef}
-        className={`bg-muted/30 rounded-b-lg p-2 space-y-2 min-h-[200px] transition-colors ${isOver ? "ring-2 ring-primary/40 bg-primary/5" : ""}`}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function DraggableCard({ lead, onClick, atividades }: { lead: Lead; onClick: () => void; atividades: Atividade[] }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: lead.id });
-  const style: React.CSSProperties | undefined = transform
-    ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: isDragging ? 999 : undefined, opacity: isDragging ? 0.5 : 1 }
-    : undefined;
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="rounded-lg border border-border bg-card p-3 hover:border-primary/30 transition-colors space-y-2 group"
-    >
-      <div className="flex items-start gap-2">
-        <div
-          {...listeners}
-          {...attributes}
-          className="cursor-grab active:cursor-grabbing pt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
-        </div>
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
-          <p className="font-medium text-sm truncate">{lead.fantasia || lead.razao_social}</p>
-          <p className="text-xs text-muted-foreground">{lead.bairro} · {lead.celular1 || lead.telefone1 || "—"}</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        {lead.lead_score !== null && (
-          <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-bold ${
-            lead.lead_score >= 70 ? "bg-success/15 text-success" : lead.lead_score >= 40 ? "bg-warning/15 text-warning" : "bg-destructive/15 text-destructive"
-          }`}>{lead.lead_score} pts</span>
-        )}
-        {lead.valor_negocio_estimado != null && lead.valor_negocio_estimado > 0 && (
-          <span className="text-xs text-muted-foreground">
-            R$ {lead.valor_negocio_estimado.toLocaleString("pt-BR")}
-          </span>
-        )}
-      </div>
-      {atividades.length > 0 && (
-        <div className="border-t border-border pt-2 space-y-1">
-          {atividades.slice(0, 3).map((a) => (
-            <div key={a.id} className="text-xs text-muted-foreground flex gap-1.5">
-              <span className="font-medium text-foreground/70">{a.tipo_atividade}</span>
-              <span>→ {a.resultado}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function CloserPipeline({ territorio, onSelectLead }: Props) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [atividades, setAtividades] = useState<Record<string, Atividade[]>>({});
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<PipelineFilterValues>({
+    search: "",
+    scoreFilter: "all",
+    sortBy: "recent",
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -120,42 +59,52 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
       .channel('closer-pipeline-realtime')
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'leads',
-          filter: 'status_sdr=eq.Reunião Agendada',
-        },
+        { event: 'UPDATE', schema: 'public', table: 'leads', filter: 'status_sdr=eq.Reunião Agendada' },
         (payload) => {
           const newLead = payload.new as any;
           const oldLead = payload.old as any;
-
-          // Only notify if the lead just moved to "Reunião Agendada"
           if (oldLead?.status_sdr !== 'Reunião Agendada' && newLead?.status_sdr === 'Reunião Agendada') {
             const nome = newLead.fantasia || newLead.razao_social || 'Lead';
             toast({
               title: "🔔 Nova Reunião Agendada!",
               description: `${nome} (${newLead.cidade || '—'}) foi movido para o pipeline.`,
             });
-
-            // Play notification sound
             try {
               const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbsGczJjmEw9jUhkMtPXmv0NmcUjhHcKXM2qpfO0pvn8XYsmY+TGueyNS1d0NMdJ7B0bVxREhribrSuXlJUHWXvM+5eElQdJa7z7lwSlF2mL3PuXNLUnabvs+5c0pQdJe80LpyS1J2mLzPuXBKUHSXvM+5');
               audio.volume = 0.3;
               audio.play().catch(() => {});
             } catch {}
-
-            // Refresh the pipeline data
             loadData();
           }
         }
       )
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [loadData]);
+
+  // Apply filters & sorting
+  const filteredLeads = useMemo(() => {
+    let result = [...leads];
+
+    if (filters.search.trim()) {
+      const s = filters.search.toLowerCase();
+      result = result.filter((l) =>
+        (l.fantasia || "").toLowerCase().includes(s) ||
+        (l.razao_social || "").toLowerCase().includes(s) ||
+        (l.bairro || "").toLowerCase().includes(s) ||
+        (l.cnpj || "").includes(s)
+      );
+    }
+
+    if (filters.scoreFilter === "high") result = result.filter((l) => (l.lead_score ?? 0) >= 70);
+    else if (filters.scoreFilter === "medium") result = result.filter((l) => (l.lead_score ?? 0) >= 40 && (l.lead_score ?? 0) < 70);
+    else if (filters.scoreFilter === "low") result = result.filter((l) => (l.lead_score ?? 0) < 40);
+
+    if (filters.sortBy === "score") result.sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0));
+    else if (filters.sortBy === "value") result.sort((a, b) => (b.valor_negocio_estimado ?? 0) - (a.valor_negocio_estimado ?? 0));
+
+    return result;
+  }, [leads, filters]);
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -167,14 +116,12 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
     const lead = leads.find((l) => l.id === leadId);
     if (!lead || lead.estagio_funil === newStage) return;
 
-    // Optimistic update
     setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, estagio_funil: newStage } : l)));
 
     try {
       await updateLead({ ...lead, estagio_funil: newStage });
       toast({ title: "Lead movido", description: `${lead.fantasia || lead.razao_social} → ${newStage}` });
     } catch (err: any) {
-      // Rollback
       setLeads((prev) => prev.map((l) => (l.id === leadId ? lead : l)));
       toast({ title: "Erro ao mover", description: err.message, variant: "destructive" });
     }
@@ -185,30 +132,34 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
   }
 
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-      <div className="overflow-x-auto pb-4">
-        <div className="flex gap-4 min-w-max">
-          {COLUMNS.map((col) => {
-            const colLeads = leads.filter((l) => l.estagio_funil === col);
-            const colorClass = ESTAGIO_COLORS[col] || "";
-            return (
-              <DroppableColumn key={col} id={col} colorClass={colorClass} count={colLeads.length}>
-                {colLeads.map((lead) => (
-                  <DraggableCard
-                    key={lead.id}
-                    lead={lead}
-                    onClick={() => onSelectLead(lead)}
-                    atividades={atividades[lead.id] || []}
-                  />
-                ))}
-                {colLeads.length === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-8">Vazio</p>
-                )}
-              </DroppableColumn>
-            );
-          })}
+    <div className="space-y-2">
+      <PipelineFilters filters={filters} onChange={setFilters} />
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <div className="overflow-x-auto pb-4">
+          <div className="flex gap-4 min-w-max">
+            {COLUMNS.map((col) => {
+              const colLeads = filteredLeads.filter((l) => l.estagio_funil === col);
+              const colorClass = ESTAGIO_COLORS[col] || "";
+              const totalValue = colLeads.reduce((sum, l) => sum + (l.valor_negocio_estimado ?? 0), 0);
+              return (
+                <PipelineColumn key={col} id={col} colorClass={colorClass} count={colLeads.length} totalValue={totalValue}>
+                  {colLeads.map((lead) => (
+                    <PipelineCard
+                      key={lead.id}
+                      lead={lead}
+                      onClick={() => onSelectLead(lead)}
+                      atividades={atividades[lead.id] || []}
+                    />
+                  ))}
+                  {colLeads.length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-8">Vazio</p>
+                  )}
+                </PipelineColumn>
+              );
+            })}
+          </div>
         </div>
-      </div>
-    </DndContext>
+      </DndContext>
+    </div>
   );
 }
