@@ -41,18 +41,24 @@ function AnalyticsView({ territorio }: { territorio: string }) {
   const [period, setPeriod] = useState<number>(1);
   const [analytics, setAnalytics] = useState<ManagerAnalytics | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [trend, setTrend] = useState<ActivityTrendEntry[]>([]);
+  const [funnel, setFunnel] = useState<FunnelEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const cidade = territorio || null;
-      const [a, l] = await Promise.all([
+      const [a, l, t, f] = await Promise.all([
         getManagerAnalytics(cidade, period),
         getLeaderboard(cidade, period),
+        getActivityTrend(cidade, period < 7 ? 7 : period),
+        getConversionFunnel(cidade),
       ]);
       setAnalytics(a);
       setLeaderboard(l);
+      setTrend(t);
+      setFunnel(f);
     } catch (err: any) {
       toast({ title: "Erro ao carregar analytics", description: err.message, variant: "destructive" });
     } finally {
