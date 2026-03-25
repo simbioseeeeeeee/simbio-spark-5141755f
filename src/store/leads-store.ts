@@ -33,6 +33,8 @@ function rowToLead(row: any): Lead {
     url_instagram: row.url_instagram || "",
     faz_anuncios: row.faz_anuncios || false,
     whatsapp_automacao: row.whatsapp_automacao || false,
+    pesquisa_realizada: row.pesquisa_realizada || false,
+    lead_score: row.lead_score ?? null,
     observacoes_sdr: row.observacoes_sdr || "",
     estagio_funil: row.estagio_funil || null,
     valor_negocio_estimado: row.valor_negocio_estimado || null,
