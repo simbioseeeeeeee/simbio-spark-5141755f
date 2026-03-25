@@ -121,6 +121,7 @@ function SdrFocoView() {
                       Dia {lead.dia_cadencia}: {step}
                     </span>
                     {isOverdue && <span className="text-xs text-destructive">(Atrasado)</span>}
+                    <span className="text-xs text-muted-foreground">· {lead.cidade}</span>
                     <span className="text-xs text-muted-foreground">· {lead.celular1 || lead.telefone1 || "Sem telefone"}</span>
                   </div>
                 </div>
