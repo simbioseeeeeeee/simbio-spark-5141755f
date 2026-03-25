@@ -14,6 +14,7 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onDone: (updated: Lead) => void;
+  userId?: string;
 }
 
 export function ActivityModal({ lead, open, onClose, onDone }: Props) {
