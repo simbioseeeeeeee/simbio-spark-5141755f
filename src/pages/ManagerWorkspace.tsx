@@ -15,12 +15,15 @@ import { LeadExplorer } from "@/components/LeadExplorer";
 import { LeadProfile } from "@/components/LeadProfile";
 import { NewLeadModal } from "@/components/NewLeadModal";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import {
   Users, Activity, CalendarCheck, DollarSign, Trophy, Loader2, Target, BarChart3, TrendingUp, PieChart,
+  AlertTriangle, Pencil,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "react-router-dom";
@@ -30,16 +33,46 @@ import {
   Pie, RadialBarChart, RadialBar,
 } from "recharts";
 
+// ─── Editable daily targets (persisted in localStorage) ─────
+interface DailyTargets {
+  leads: number;
+  atividades: number;
+  reunioes: number;
+  fechamentos: number;
+  pipeline: number;
+}
+
+const DEFAULT_TARGETS: DailyTargets = { leads: 5, atividades: 30, reunioes: 3, fechamentos: 1, pipeline: 10000 };
+const TARGETS_KEY = "manager_daily_targets";
+
+function loadTargets(): DailyTargets {
+  try {
+    const raw = localStorage.getItem(TARGETS_KEY);
+    if (raw) return { ...DEFAULT_TARGETS, ...JSON.parse(raw) };
+  } catch { /* ignore */ }
+  return { ...DEFAULT_TARGETS };
+}
+
+function saveTargets(t: DailyTargets) {
+  localStorage.setItem(TARGETS_KEY, JSON.stringify(t));
+}
+
+// ─── KPI Card with target, alerts & progress ────────────────
 function KpiCard({ label, value, icon: Icon, color, prefix, target }: { label: string; value: string | number; icon: any; color: string; prefix?: string; target?: number }) {
   const numericValue = typeof value === "number" ? value : parseFloat(String(value).replace(/[^0-9.-]/g, "")) || 0;
-  const pct = target && target > 0 ? Math.min((numericValue / target) * 100, 100) : null;
+  const pct = target && target > 0 ? Math.min((numericValue / target) * 100, 150) : null;
   const isAboveTarget = target ? numericValue >= target : false;
+  const isCritical = pct !== null && pct < 50;
+  const isWarning = pct !== null && pct >= 50 && pct < 80;
 
   return (
-    <Card className="border-border">
+    <Card className={`border-border transition-all ${isCritical ? "border-destructive/60 shadow-[0_0_12px_-2px_hsl(var(--destructive)/0.25)]" : ""}`}>
       <CardContent className="p-5 space-y-2">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-medium text-muted-foreground">{label}</p>
+            {isCritical && <AlertTriangle className="h-3.5 w-3.5 text-destructive animate-pulse" />}
+          </div>
           <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${color}`}>
             <Icon className="h-4.5 w-4.5" />
           </div>
@@ -49,11 +82,22 @@ function KpiCard({ label, value, icon: Icon, color, prefix, target }: { label: s
           <div className="space-y-1">
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-muted-foreground">Meta: {prefix}{target.toLocaleString("pt-BR")}</span>
-              <span className={`font-semibold ${isAboveTarget ? "text-success" : "text-warning"}`}>
-                {pct !== null ? `${pct.toFixed(0)}%` : "—"}
+              <span className={`font-semibold ${isAboveTarget ? "text-success" : isCritical ? "text-destructive" : "text-warning"}`}>
+                {pct !== null ? `${Math.min(pct, 100).toFixed(0)}%` : "—"}
               </span>
             </div>
-            <Progress value={pct ?? 0} className="h-1.5" />
+            <div className="relative">
+              <Progress
+                value={pct !== null ? Math.min(pct, 100) : 0}
+                className={`h-1.5 ${isCritical ? "[&>div]:bg-destructive" : isWarning ? "[&>div]:bg-warning" : "[&>div]:bg-success"}`}
+              />
+            </div>
+            {isCritical && (
+              <p className="text-[10px] text-destructive font-medium flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Abaixo de 50% da meta
+              </p>
+            )}
           </div>
         )}
       </CardContent>
