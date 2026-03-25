@@ -50,6 +50,9 @@ export interface LeadsQuery {
   statusFilter?: string;
   cidadeFilter?: string;
   ufFilter?: string;
+  pesquisaFilter?: string;
+  scoreFilter?: string;
+  sortByScore?: boolean;
 }
 
 export interface LeadsResult {
