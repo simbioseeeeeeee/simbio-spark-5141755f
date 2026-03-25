@@ -34,10 +34,12 @@ export type Database = {
           faz_anuncios: boolean
           id: string
           instagram_ativo: boolean
+          lead_score: number | null
           logradouro: string | null
           numero: string | null
           observacoes_closer: string | null
           observacoes_sdr: string | null
+          pesquisa_realizada: boolean
           possui_site: boolean
           razao_social: string | null
           situacao: string | null
@@ -70,10 +72,12 @@ export type Database = {
           faz_anuncios?: boolean
           id?: string
           instagram_ativo?: boolean
+          lead_score?: number | null
           logradouro?: string | null
           numero?: string | null
           observacoes_closer?: string | null
           observacoes_sdr?: string | null
+          pesquisa_realizada?: boolean
           possui_site?: boolean
           razao_social?: string | null
           situacao?: string | null
@@ -106,10 +110,12 @@ export type Database = {
           faz_anuncios?: boolean
           id?: string
           instagram_ativo?: boolean
+          lead_score?: number | null
           logradouro?: string | null
           numero?: string | null
           observacoes_closer?: string | null
           observacoes_sdr?: string | null
+          pesquisa_realizada?: boolean
           possui_site?: boolean
           razao_social?: string | null
           situacao?: string | null
