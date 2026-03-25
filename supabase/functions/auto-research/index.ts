@@ -209,11 +209,48 @@ ${searchSummary || 'Nenhum resultado encontrado.'}`;
     const parsed = JSON.parse(toolCall.function.arguments);
     console.log('Parsed tool result:', JSON.stringify(parsed));
 
+    // Normalizar "null" string para null real
+    const cleanUrl = (v: any): string | null => {
+      if (!v || v === 'null' || v === 'undefined' || v === 'N/A') return null;
+      return String(v).trim();
+    };
+
+    let urlSite = cleanUrl(parsed.url_site);
+    let urlInstagram = cleanUrl(parsed.url_instagram);
+
+    // Validar URLs com HEAD request
+    async function validateUrl(url: string | null): Promise<string | null> {
+      if (!url) return null;
+      try {
+        const res = await fetch(url, {
+          method: 'HEAD',
+          redirect: 'follow',
+          signal: AbortSignal.timeout(5000),
+        });
+        if (res.ok || res.status === 405 || res.status === 403) {
+          // 405/403 = server exists but blocks HEAD, still valid
+          return url;
+        }
+        console.log(`URL validation failed (${res.status}): ${url}`);
+        return null;
+      } catch (e) {
+        console.log(`URL validation error for ${url}:`, e);
+        return null;
+      }
+    }
+
+    [urlSite, urlInstagram] = await Promise.all([
+      validateUrl(urlSite),
+      validateUrl(urlInstagram),
+    ]);
+
+    console.log('Validated URLs:', { urlSite, urlInstagram });
+
     const result: ResearchResult = {
-      possui_site: !!parsed.url_site,
-      url_site: parsed.url_site || '',
-      instagram_ativo: !!parsed.url_instagram,
-      url_instagram: parsed.url_instagram || '',
+      possui_site: !!urlSite,
+      url_site: urlSite || '',
+      instagram_ativo: !!urlInstagram,
+      url_instagram: urlInstagram || '',
       faz_anuncios: !!parsed.faz_anuncios,
       whatsapp_automacao: !!parsed.whatsapp_automacao,
       observacoes_sdr: parsed.observacoes || '',
