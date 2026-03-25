@@ -165,6 +165,16 @@ export default function Login() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Reset Cache */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full text-xs text-muted-foreground hover:text-destructive"
+          onClick={handleResetCache}
+        >
+          🔄 Resetar cache do app (tela travada?)
+        </Button>
       </div>
     </div>
   );
