@@ -3,6 +3,7 @@ import { Lead, CADENCE_STEPS } from "@/types/lead";
 import { getCadenciaHoje, getDailyMetrics, DailyMetrics, getDistinctCidades } from "@/store/leads-store";
 import { ActivityModal } from "@/components/ActivityModal";
 import { LeadProfile } from "@/components/LeadProfile";
+import { BatchResearch } from "@/components/BatchResearch";
 import { LeadExplorer } from "@/components/LeadExplorer";
 import { CloserPipeline } from "@/components/CloserPipeline";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
