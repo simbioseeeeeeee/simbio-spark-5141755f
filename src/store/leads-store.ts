@@ -56,13 +56,44 @@ export interface LeadsResult {
   pageSize: number;
 }
 
-export async function getLeadsPaginated({ page, search, statusFilter }: LeadsQuery): Promise<LeadsResult> {
+export async function getDistinctUFs(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("leads")
+    .select("uf")
+    .not("uf", "is", null)
+    .order("uf");
+  if (error) throw error;
+  const unique = [...new Set((data || []).map((r: any) => r.uf).filter(Boolean))];
+  return unique.sort();
+}
+
+export async function getDistinctCidades(uf?: string): Promise<string[]> {
+  let query = supabase
+    .from("leads")
+    .select("cidade")
+    .not("cidade", "is", null);
+  if (uf && uf !== "all") query = query.eq("uf", uf);
+  const { data, error } = await query.order("cidade");
+  if (error) throw error;
+  const unique = [...new Set((data || []).map((r: any) => r.cidade).filter(Boolean))];
+  return unique.sort();
+}
+
+export async function getLeadsPaginated({ page, search, statusFilter, cidadeFilter, ufFilter }: LeadsQuery): Promise<LeadsResult> {
   let query = supabase
     .from("leads")
     .select("*", { count: "exact" });
 
   if (statusFilter && statusFilter !== "all") {
     query = query.eq("status_sdr", statusFilter);
+  }
+
+  if (ufFilter && ufFilter !== "all") {
+    query = query.eq("uf", ufFilter);
+  }
+
+  if (cidadeFilter && cidadeFilter !== "all") {
+    query = query.eq("cidade", cidadeFilter);
   }
 
   if (search && search.trim()) {
