@@ -41,16 +41,27 @@ function SdrFocoView() {
   const { user } = useAuth();
   const [metrics, setMetrics] = useState<DailyMetrics>({ pesquisas_hoje: 0, tentativas_hoje: 0, conexoes_hoje: 0, reunioes_hoje: 0 });
   const [cadencia, setCadencia] = useState<Lead[]>([]);
+  const [concluidas, setConcluidas] = useState<Lead[]>([]);
+  const [amanha, setAmanha] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
+  const [showConcluidas, setShowConcluidas] = useState(false);
+  const [showAmanha, setShowAmanha] = useState(false);
 
   const loadFocoData = useCallback(async () => {
     setLoading(true);
     try {
-      const [m, c] = await Promise.all([getDailyMetrics(), getCadenciaHoje()]);
+      const [m, c, done, tomorrow] = await Promise.all([
+        getDailyMetrics(),
+        getCadenciaHoje(),
+        getCadenciaConcluidasHoje(),
+        getCadenciaAmanha(),
+      ]);
       setMetrics(m);
       setCadencia(c);
+      setConcluidas(done);
+      setAmanha(tomorrow);
     } catch (err: any) {
       toast({ title: "Erro ao carregar dados", description: err.message, variant: "destructive" });
     } finally {
