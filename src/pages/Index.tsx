@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Search, Users, List, Columns3, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Building2, Search, Users, List, Columns3, Loader2, ChevronLeft, ChevronRight, Bot } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function Index() {
@@ -184,6 +184,7 @@ export default function Index() {
                         <TableHead className="w-[180px]">Status</TableHead>
                         <TableHead>Razão Social</TableHead>
                         <TableHead className="w-[180px]">CNPJ</TableHead>
+                        <TableHead className="w-[160px]">Celular</TableHead>
                         <TableHead className="w-[150px]">Cidade/UF</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -197,6 +198,14 @@ export default function Index() {
                           <TableCell><StatusBadge status={lead.status_sdr} /></TableCell>
                           <TableCell className="font-medium">{lead.fantasia || lead.razao_social}</TableCell>
                           <TableCell className="text-muted-foreground font-mono text-xs">{lead.cnpj}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            <span className="inline-flex items-center gap-1.5">
+                              {lead.celular1 || "—"}
+                              {lead.whatsapp_automacao && (
+                                <span title="WhatsApp com automação (Bot)"><Bot className="h-3.5 w-3.5 text-warning" /></span>
+                              )}
+                            </span>
+                          </TableCell>
                           <TableCell className="text-muted-foreground">{lead.cidade}/{lead.uf}</TableCell>
                         </TableRow>
                       ))}

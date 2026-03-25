@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/hooks/use-toast";
-import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar } from "lucide-react";
+import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot } from "lucide-react";
 
 function PhoneLink({ phone, isCelular }: { phone: string; isCelular?: boolean }) {
   if (!phone) return null;
@@ -196,6 +196,12 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                   <Label htmlFor="ads" className="flex items-center gap-2"><Megaphone className="h-4 w-4" /> Faz Anúncios?</Label>
                   <Switch id="ads" checked={current.faz_anuncios} onCheckedChange={(v) => setField("faz_anuncios", v)} />
                 </div>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="bot" className="flex items-center gap-2"><Bot className="h-4 w-4" /> WhatsApp tem Automação (Bot)?</Label>
+                  <Switch id="bot" checked={current.whatsapp_automacao} onCheckedChange={(v) => setField("whatsapp_automacao", v)} />
+                </div>
+                <p className="text-xs text-muted-foreground -mt-2">Marque se o primeiro atendimento é feito por robô.</p>
 
                 <Separator />
 
