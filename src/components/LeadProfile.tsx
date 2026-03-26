@@ -315,7 +315,7 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                     value={current.whatsapp_humano ? "humano" : current.whatsapp_automacao ? "bot" : "nenhum"}
                     onValueChange={(v) => {
                       setForm({
-                        ...form!,
+                        ...current!,
                         whatsapp_humano: v === "humano",
                         whatsapp_automacao: v === "bot",
                       });
