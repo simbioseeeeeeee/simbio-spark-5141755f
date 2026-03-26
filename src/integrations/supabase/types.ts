@@ -55,6 +55,42 @@ export type Database = {
           },
         ]
       }
+      kpi_daily_snapshots: {
+        Row: {
+          atividades: number
+          cidade: string | null
+          created_at: string
+          fechamentos: number
+          id: string
+          leads_qualificados: number
+          reunioes: number
+          snapshot_date: string
+          valor_pipeline: number
+        }
+        Insert: {
+          atividades?: number
+          cidade?: string | null
+          created_at?: string
+          fechamentos?: number
+          id?: string
+          leads_qualificados?: number
+          reunioes?: number
+          snapshot_date?: string
+          valor_pipeline?: number
+        }
+        Update: {
+          atividades?: number
+          cidade?: string | null
+          created_at?: string
+          fechamentos?: number
+          id?: string
+          leads_qualificados?: number
+          reunioes?: number
+          snapshot_date?: string
+          valor_pipeline?: number
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           bairro: string | null
@@ -181,6 +217,42 @@ export type Database = {
           url_site?: string | null
           valor_negocio_estimado?: number | null
           whatsapp_automacao?: boolean
+        }
+        Relationships: []
+      }
+      manager_targets: {
+        Row: {
+          atividades: number
+          created_at: string
+          fechamentos: number
+          id: string
+          leads: number
+          pipeline: number
+          reunioes: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          atividades?: number
+          created_at?: string
+          fechamentos?: number
+          id?: string
+          leads?: number
+          pipeline?: number
+          reunioes?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          atividades?: number
+          created_at?: string
+          fechamentos?: number
+          id?: string
+          leads?: number
+          pipeline?: number
+          reunioes?: number
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -409,6 +481,22 @@ export type Database = {
           tentativas_hoje: number
         }[]
       }
+      get_kpi_alerts: {
+        Args: {
+          p_cidade?: string
+          p_target_atividades?: number
+          p_target_fechamentos?: number
+          p_target_leads?: number
+          p_target_pipeline?: number
+          p_target_reunioes?: number
+        }
+        Returns: {
+          consecutive_days: number
+          current_value: number
+          daily_target: number
+          kpi_name: string
+        }[]
+      }
       get_lead_atividades: {
         Args: { p_lead_id: string; p_limit?: number }
         Returns: {
@@ -467,6 +555,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      snapshot_daily_kpis: { Args: { p_cidade?: string }; Returns: undefined }
     }
     Enums: {
       app_role: "sdr" | "closer" | "manager"
