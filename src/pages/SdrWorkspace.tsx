@@ -49,6 +49,11 @@ function SdrFocoView() {
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
   const [showConcluidas, setShowConcluidas] = useState(false);
   const [showAmanha, setShowAmanha] = useState(false);
+  const [cidadeFilter, setCidadeFilter] = useState("__all__");
+
+  const filteredCadencia = useMemo(() => filterByCidade(cadencia, cidadeFilter), [cadencia, cidadeFilter]);
+  const filteredConcluidas = useMemo(() => filterByCidade(concluidas, cidadeFilter), [concluidas, cidadeFilter]);
+  const filteredAmanha = useMemo(() => filterByCidade(amanha, cidadeFilter), [amanha, cidadeFilter]);
 
   const loadFocoData = useCallback(async () => {
     setLoading(true);
