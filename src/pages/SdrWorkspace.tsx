@@ -186,16 +186,16 @@ function SdrFocoView() {
       )}
 
       {/* Tomorrow's Tasks */}
-      {!loading && amanha.length > 0 && (
+      {!loading && filteredAmanha.length > 0 && (
         <Collapsible open={showAmanha} onOpenChange={setShowAmanha}>
           <CollapsibleTrigger className="flex items-center gap-2 w-full text-left py-2">
             <CalendarClock className="h-4 w-4 text-primary" />
             <span className="text-sm font-semibold text-foreground">Amanhã</span>
-            <span className="text-xs text-muted-foreground">({amanha.length})</span>
+            <span className="text-xs text-muted-foreground">({filteredAmanha.length})</span>
             <span className="text-xs text-muted-foreground ml-auto">{showAmanha ? "▾" : "▸"}</span>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-2">
-            {amanha.map((lead) => {
+            {filteredAmanha.map((lead) => {
               const step = CADENCE_STEPS[lead.dia_cadencia] || `Passo ${lead.dia_cadencia + 1}`;
               return (
                 <div key={lead.id} className="rounded-lg border border-dashed border-border bg-card/30 p-3 flex items-center gap-3">
