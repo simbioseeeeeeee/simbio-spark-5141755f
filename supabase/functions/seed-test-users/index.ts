@@ -18,15 +18,15 @@ Deno.serve(async (req) => {
     );
 
     const testUsers = [
-      { email: "sdr@simbiose.com", password: "test1234", role: "sdr", nome: "Ana SDR" },
-      { email: "closer@simbiose.com", password: "test1234", role: "closer", nome: "Bruno Closer" },
-      { email: "manager@simbiose.com", password: "test1234", role: "manager", nome: "Carlos Gerente" },
+      { email: "sdr@simbiose.com", password: "test1234", role: "sdr", nome: "Larissa" },
+      { email: "closer@simbiose.com", password: "test1234", role: "closer", nome: "Junior" },
+      { email: "manager@simbiose.com", password: "test1234", role: "manager", nome: "Cleiane" },
+      { email: "guilherme@simbiosedigital.com", password: "Simbiose2026!", role: "manager", nome: "Guilherme" },
     ];
 
     const results = [];
 
     for (const u of testUsers) {
-      // Check if user exists
       const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
       const existing = listData?.users?.find((eu: any) => eu.email === u.email);
 
@@ -46,19 +46,11 @@ Deno.serve(async (req) => {
         userId = data.user.id;
       }
 
-      // Upsert role (delete existing + insert to handle unique constraint)
-      await supabaseAdmin
-        .from("user_roles")
-        .delete()
-        .eq("user_id", userId);
+      await supabaseAdmin.from("user_roles").delete().eq("user_id", userId);
 
       const { error: roleErr } = await supabaseAdmin
         .from("user_roles")
-        .insert({
-          user_id: userId,
-          role: u.role,
-          nome: u.nome,
-        });
+        .insert({ user_id: userId, role: u.role, nome: u.nome });
 
       if (roleErr) {
         results.push({ email: u.email, error: roleErr.message });
