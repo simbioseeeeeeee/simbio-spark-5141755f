@@ -120,15 +120,13 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
 
       setForm(updated);
 
-      // Log pesquisa activity if not previously researched
-      if (!current.pesquisa_realizada) {
-        await supabase.from("atividades").insert({
-          lead_id: current.id,
-          tipo_atividade: "Pesquisa",
-          resultado: "Pesquisa Concluída",
-          nota: `Pesquisa IA individual — Score: ${updated.lead_score}`,
-        });
-      }
+      // Log pesquisa activity for every AI research execution
+      await supabase.from("atividades").insert({
+        lead_id: current.id,
+        tipo_atividade: "Pesquisa",
+        resultado: "Pesquisa Concluída",
+        nota: `Pesquisa IA individual — Score: ${updated.lead_score}`,
+      });
 
       toast({ title: "✅ Pesquisa concluída!", description: `Score: ${updated.lead_score} pts. Revise e salve.` });
     } catch (err: any) {
