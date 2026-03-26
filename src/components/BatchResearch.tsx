@@ -93,6 +93,7 @@ export function BatchResearch({ cidade, onComplete }: Props) {
           instagram_ativo: result.instagram_ativo,
           faz_anuncios: result.faz_anuncios,
           whatsapp_automacao: result.whatsapp_automacao,
+          whatsapp_humano: false,
         });
 
         // Update lead

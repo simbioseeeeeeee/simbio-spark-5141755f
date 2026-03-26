@@ -309,11 +309,26 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                   <Switch id="ads" checked={current.faz_anuncios} onCheckedChange={(v) => setField("faz_anuncios", v)} />
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="bot" className="flex items-center gap-2"><Bot className="h-4 w-4" /> WhatsApp com Bot? <span className="text-xs text-muted-foreground">(+10pts)</span></Label>
-                  <Switch id="bot" checked={current.whatsapp_automacao} onCheckedChange={(v) => setField("whatsapp_automacao", v)} />
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2"><Bot className="h-4 w-4" /> WhatsApp</Label>
+                  <Select
+                    value={current.whatsapp_humano ? "humano" : current.whatsapp_automacao ? "bot" : "nenhum"}
+                    onValueChange={(v) => {
+                      setForm({
+                        ...form!,
+                        whatsapp_humano: v === "humano",
+                        whatsapp_automacao: v === "bot",
+                      });
+                    }}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nenhum">Não possui WhatsApp</SelectItem>
+                      <SelectItem value="humano">WhatsApp sem Bot (+10pts)</SelectItem>
+                      <SelectItem value="bot">WhatsApp com Bot (+5pts)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <p className="text-xs text-muted-foreground -mt-2">Marque se o primeiro atendimento é feito por robô.</p>
 
                 <Separator />
 
