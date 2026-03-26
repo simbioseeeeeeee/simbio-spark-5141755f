@@ -154,16 +154,16 @@ function SdrFocoView() {
       )}
 
       {/* Completed Today */}
-      {!loading && concluidas.length > 0 && (
+      {!loading && filteredConcluidas.length > 0 && (
         <Collapsible open={showConcluidas} onOpenChange={setShowConcluidas}>
           <CollapsibleTrigger className="flex items-center gap-2 w-full text-left py-2">
             <CheckCircle2 className="h-4 w-4 text-success" />
             <span className="text-sm font-semibold text-foreground">Concluídas Hoje</span>
-            <span className="text-xs text-muted-foreground">({concluidas.length})</span>
+            <span className="text-xs text-muted-foreground">({filteredConcluidas.length})</span>
             <span className="text-xs text-muted-foreground ml-auto">{showConcluidas ? "▾" : "▸"}</span>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-2">
-            {concluidas.map((lead) => {
+            {filteredConcluidas.map((lead) => {
               const step = CADENCE_STEPS[lead.dia_cadencia] || `Passo ${lead.dia_cadencia + 1}`;
               return (
                 <div key={lead.id} className="rounded-lg border border-border bg-card/50 p-3 flex items-center gap-3 opacity-70">
