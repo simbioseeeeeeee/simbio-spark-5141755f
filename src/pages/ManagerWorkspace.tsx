@@ -680,18 +680,12 @@ export default function ManagerWorkspace() {
   const isAnalytics = !isCadencia && !isPipeline && !isExplorer;
 
   // Import SdrFocoView dynamically to avoid circular deps - inline a simpler version
-  const needsTerritory = isAnalytics || isCadencia || isExplorer;
+  const needsTerritory = isAnalytics || isExplorer;
 
   return (
     <AppLayout headerExtra={needsTerritory ? <TerritorySelector value={territorio} onChange={setTerritorio} showAll={isAnalytics} /> : undefined}>
       {isAnalytics && <AnalyticsView territorio={territorio === "__all__" ? "" : territorio} />}
-      {isCadencia && (
-        territorio ? (
-          <SdrCadenciaForManager territorio={territorio} />
-        ) : (
-          <div className="text-center py-16 text-muted-foreground">Selecione um território acima.</div>
-        )
-      )}
+      {isCadencia && <SdrCadenciaForManager />}
       {isPipeline && <ManagerPipelineView />}
       {isExplorer && <ManagerExplorerView territorio={territorio} />}
     </AppLayout>
@@ -704,7 +698,7 @@ import { ActivityModal } from "@/components/ActivityModal";
 import { BatchResearch } from "@/components/BatchResearch";
 import { Crosshair, Search, Phone, MessageSquare, Bot } from "lucide-react";
 
-function SdrCadenciaForManager({ territorio }: { territorio: string }) {
+function SdrCadenciaForManager() {
   const { user } = useAuth();
   const [metrics, setMetrics] = useState<DailyMetrics>({ pesquisas_hoje: 0, tentativas_hoje: 0, conexoes_hoje: 0, reunioes_hoje: 0 });
   const [cadencia, setCadencia] = useState<Lead[]>([]);
@@ -713,10 +707,9 @@ function SdrCadenciaForManager({ territorio }: { territorio: string }) {
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
 
   const loadData = useCallback(async () => {
-    if (!territorio) return;
     setLoading(true);
     try {
-      const [m, c] = await Promise.all([getDailyMetrics(territorio), getCadenciaHoje(territorio)]);
+      const [m, c] = await Promise.all([getDailyMetrics(), getCadenciaHoje()]);
       setMetrics(m);
       setCadencia(c);
     } catch (err: any) {
@@ -724,7 +717,7 @@ function SdrCadenciaForManager({ territorio }: { territorio: string }) {
     } finally {
       setLoading(false);
     }
-  }, [territorio]);
+  }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -758,11 +751,11 @@ function SdrCadenciaForManager({ territorio }: { territorio: string }) {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-sm font-semibold flex items-center gap-2">
           <Crosshair className="h-4 w-4 text-primary" />
-          Cadência SDR — {territorio}
+          Cadência SDR — Todas as Regiões
           <span className="text-muted-foreground font-normal">({cadencia.length} leads)</span>
         </h2>
         <div className="flex items-center gap-2">
-          <BatchResearch cidade={territorio} onComplete={loadData} />
+          <BatchResearch onComplete={loadData} />
           <Button variant="ghost" size="sm" onClick={loadData} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
           </Button>
@@ -793,6 +786,7 @@ function SdrCadenciaForManager({ territorio }: { territorio: string }) {
                       Dia {lead.dia_cadencia}: {step}
                     </span>
                     {isOverdue && <span className="text-xs text-destructive">(Atrasado)</span>}
+                    <span className="text-xs text-muted-foreground">· {lead.cidade}</span>
                   </div>
                 </div>
                 <Button size="sm" onClick={() => setActivityLead(lead)} className="shrink-0">Executar</Button>

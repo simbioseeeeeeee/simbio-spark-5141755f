@@ -250,7 +250,7 @@ export default function SdrWorkspace() {
   }, []);
 
   return (
-    <AppLayout headerExtra={<TerritorySelector value={territorio} onChange={setTerritorio} />}>
+    <AppLayout headerExtra={isExplorer ? <TerritorySelector value={territorio} onChange={setTerritorio} /> : undefined}>
       {isExplorer ? (
         <SdrExplorerView territorio={territorio} />
       ) : (

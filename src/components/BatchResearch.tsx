@@ -12,6 +12,8 @@ interface Props {
   onComplete: () => void;
 }
 
+
+
 interface BatchState {
   running: boolean;
   total: number;
@@ -29,13 +31,18 @@ export function BatchResearch({ cidade, onComplete }: Props) {
     cancelRef.current = false;
 
     // Fetch unresearched leads for this city
-    const { data: leads, error } = await supabase
+    let query = supabase
       .from("leads")
       .select("*")
-      .eq("cidade", cidade)
       .eq("pesquisa_realizada", false)
       .order("created_at", { ascending: true })
       .limit(500);
+
+    if (cidade) {
+      query = query.eq("cidade", cidade);
+    }
+
+    const { data: leads, error } = await query;
 
     if (error) {
       toast({ title: "Erro ao buscar leads", description: error.message, variant: "destructive" });
