@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { Lead, calculateScore } from "@/types/lead";
-import { updateLead } from "@/store/leads-store";
+import { calculateScore } from "@/types/lead";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -11,8 +10,6 @@ interface Props {
   cidade?: string;
   onComplete: () => void;
 }
-
-
 
 interface BatchState {
   running: boolean;
@@ -30,7 +27,11 @@ export function BatchResearch({ cidade, onComplete }: Props) {
   const runBatch = useCallback(async () => {
     cancelRef.current = false;
 
-    // Fetch unresearched leads for this city
+    // Get current user for sdr_id
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id;
+
+    // Fetch unresearched leads
     let query = supabase
       .from("leads")
       .select("*")
@@ -50,7 +51,7 @@ export function BatchResearch({ cidade, onComplete }: Props) {
     }
 
     if (!leads || leads.length === 0) {
-      toast({ title: "Nenhum lead para pesquisar", description: "Todos os leads desta cidade já foram pesquisados." });
+      toast({ title: "Nenhum lead para pesquisar", description: "Todos os leads já foram pesquisados." });
       return;
     }
 
@@ -80,6 +81,7 @@ export function BatchResearch({ cidade, onComplete }: Props) {
         });
 
         if (fnErr || !data?.success) {
+          console.warn(`[BatchResearch] Erro na pesquisa de "${name}":`, fnErr?.message || data?.error);
           errors++;
           setBatch((prev) => prev ? { ...prev, errors } : null);
           continue;
@@ -93,7 +95,8 @@ export function BatchResearch({ cidade, onComplete }: Props) {
           whatsapp_automacao: result.whatsapp_automacao,
         });
 
-        await supabase
+        // Update lead
+        const { error: updErr } = await supabase
           .from("leads")
           .update({
             possui_site: result.possui_site,
@@ -108,17 +111,32 @@ export function BatchResearch({ cidade, onComplete }: Props) {
           })
           .eq("id", lead.id);
 
-        success++;
-        setBatch((prev) => prev ? { ...prev, success } : null);
+        if (updErr) {
+          console.warn(`[BatchResearch] Erro ao atualizar lead "${name}":`, updErr.message);
+          errors++;
+          setBatch((prev) => prev ? { ...prev, errors } : null);
+          continue;
+        }
 
-        // Insert research activity
-        await supabase.from("atividades").insert({
+        // Insert research activity with sdr_id
+        const insertData: Record<string, unknown> = {
           lead_id: lead.id,
           tipo_atividade: "Pesquisa",
           resultado: "Pesquisa Concluída",
           nota: `Pesquisa IA em lote — Score: ${score}`,
-        });
-      } catch {
+        };
+        if (userId) insertData.sdr_id = userId;
+
+        const { error: actErr } = await supabase.from("atividades").insert(insertData);
+        if (actErr) {
+          console.warn(`[BatchResearch] Erro ao inserir atividade para "${name}":`, actErr.message);
+        }
+
+        success++;
+        setBatch((prev) => prev ? { ...prev, success } : null);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Erro desconhecido";
+        console.warn(`[BatchResearch] Exceção em "${name}":`, msg);
         errors++;
         setBatch((prev) => prev ? { ...prev, errors } : null);
       }
@@ -129,8 +147,8 @@ export function BatchResearch({ cidade, onComplete }: Props) {
       }
     }
 
-    const finalDone = cancelRef.current ? batch?.done || 0 : total;
-    setBatch((prev) => prev ? { ...prev, running: false, done: finalDone } : null);
+    const finalDone = cancelRef.current ? (i => i)(batch?.done || 0) : total;
+    setBatch((prev) => prev ? { ...prev, running: false, done: cancelRef.current ? prev.done : total } : null);
 
     toast({
       title: cancelRef.current ? "⏸ Pesquisa pausada" : "✅ Pesquisa em lote concluída!",
