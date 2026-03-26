@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Lead, CADENCE_STEPS } from "@/types/lead";
 import { getCadenciaHoje, getCadenciaConcluidasHoje, getCadenciaAmanha, getDailyMetrics, DailyMetrics } from "@/store/leads-store";
 import { useAuth } from "@/contexts/AuthContext";
