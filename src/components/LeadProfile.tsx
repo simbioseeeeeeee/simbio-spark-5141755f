@@ -119,6 +119,17 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
       updated.pesquisa_realizada = true;
 
       setForm(updated);
+
+      // Log pesquisa activity if not previously researched
+      if (!current.pesquisa_realizada) {
+        await supabase.from("atividades").insert({
+          lead_id: current.id,
+          tipo_atividade: "Pesquisa",
+          resultado: "Pesquisa Concluída",
+          nota: `Pesquisa IA individual — Score: ${updated.lead_score}`,
+        });
+      }
+
       toast({ title: "✅ Pesquisa concluída!", description: `Score: ${updated.lead_score} pts. Revise e salve.` });
     } catch (err: any) {
       toast({ title: "Erro na pesquisa automática", description: err.message, variant: "destructive" });

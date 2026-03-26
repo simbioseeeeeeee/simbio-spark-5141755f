@@ -1,4 +1,4 @@
-export type LeadStatus = "A Contatar" | "Em Qualificação" | "Reunião Agendada" | "Desqualificado" | "Desqualificado - Sem Perfil";
+export type LeadStatus = "A Contatar" | "Em Qualificação" | "Reunião Agendada" | "Desqualificado" | "Desqualificado - Sem Perfil" | "Desqualificado - Sem Budget" | "Desqualificado - Sem Interesse";
 
 export type EstagioFunil = "Reunião Agendada" | "Reunião Realizada" | "Proposta Enviada" | "Em Negociação" | "Fechado Ganho" | "Fechado Perdido";
 
@@ -73,6 +73,8 @@ export const STATUS_OPTIONS: LeadStatus[] = [
   "Reunião Agendada",
   "Desqualificado",
   "Desqualificado - Sem Perfil",
+  "Desqualificado - Sem Budget",
+  "Desqualificado - Sem Interesse",
 ];
 
 export const ESTAGIO_FUNIL_OPTIONS: EstagioFunil[] = [
@@ -97,6 +99,8 @@ export const STATUS_COLORS: Record<LeadStatus, string> = {
   "Reunião Agendada": "bg-primary/15 text-primary border border-primary/30",
   "Desqualificado": "bg-destructive/15 text-destructive border border-destructive/30",
   "Desqualificado - Sem Perfil": "bg-destructive/15 text-destructive border border-destructive/30",
+  "Desqualificado - Sem Budget": "bg-destructive/15 text-destructive border border-destructive/30",
+  "Desqualificado - Sem Interesse": "bg-destructive/15 text-destructive border border-destructive/30",
 };
 
 export const ESTAGIO_COLORS: Record<EstagioFunil, string> = {
