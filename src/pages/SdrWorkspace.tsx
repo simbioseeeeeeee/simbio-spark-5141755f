@@ -11,6 +11,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { TerritorySelector } from "@/components/TerritorySelector";
 import { Button } from "@/components/ui/button";
 import { Crosshair, Search, Phone, MessageSquare, CalendarCheck, Loader2, Bot, CheckCircle2, CalendarClock } from "lucide-react";
+import { CidadeFilter, filterByCidade } from "@/components/CidadeFilter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "react-router-dom";
