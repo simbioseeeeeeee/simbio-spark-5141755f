@@ -336,6 +336,30 @@ function AnalyticsView({ territorio }: { territorio: string }) {
         </Tabs>
       </div>
 
+      {/* KPI Alert Banner */}
+      {kpiAlerts.length > 0 && !alertsDismissed && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bell className="h-4 w-4 text-destructive animate-pulse" />
+              <span className="text-sm font-semibold text-destructive">Alertas de Performance</span>
+            </div>
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setAlertsDismissed(true)}>
+              Dispensar
+            </Button>
+          </div>
+          {kpiAlerts.map((alert) => (
+            <div key={alert.kpi_name} className="flex items-center gap-2 text-sm">
+              <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />
+              <span>
+                <strong>{KPI_LABELS[alert.kpi_name] || alert.kpi_name}</strong> está abaixo de 50% da meta por{" "}
+                <strong>{alert.consecutive_days} dias consecutivos</strong>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* KPI Row */}
       {(() => {
         const mult = period === 1 ? 1 : period;
