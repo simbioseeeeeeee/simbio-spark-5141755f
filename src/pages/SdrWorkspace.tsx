@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Lead, CADENCE_STEPS } from "@/types/lead";
 import { getCadenciaHoje, getCadenciaConcluidasHoje, getCadenciaAmanha, getDailyMetrics, DailyMetrics } from "@/store/leads-store";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,6 +11,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { TerritorySelector } from "@/components/TerritorySelector";
 import { Button } from "@/components/ui/button";
 import { Crosshair, Search, Phone, MessageSquare, CalendarCheck, Loader2, Bot, CheckCircle2, CalendarClock } from "lucide-react";
+import { CidadeFilter, filterByCidade } from "@/components/CidadeFilter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "react-router-dom";
@@ -48,6 +49,11 @@ function SdrFocoView() {
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
   const [showConcluidas, setShowConcluidas] = useState(false);
   const [showAmanha, setShowAmanha] = useState(false);
+  const [cidadeFilter, setCidadeFilter] = useState("__all__");
+
+  const filteredCadencia = useMemo(() => filterByCidade(cadencia, cidadeFilter), [cadencia, cidadeFilter]);
+  const filteredConcluidas = useMemo(() => filterByCidade(concluidas, cidadeFilter), [concluidas, cidadeFilter]);
+  const filteredAmanha = useMemo(() => filterByCidade(amanha, cidadeFilter), [amanha, cidadeFilter]);
 
   const loadFocoData = useCallback(async () => {
     setLoading(true);
@@ -94,11 +100,14 @@ function SdrFocoView() {
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <Crosshair className="h-4 w-4 text-primary" />
-          Foco de Hoje — Todas as Regiões
-          <span className="text-muted-foreground font-normal">({cadencia.length} leads)</span>
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Crosshair className="h-4 w-4 text-primary" />
+            Foco de Hoje
+            <span className="text-muted-foreground font-normal">({filteredCadencia.length} leads)</span>
+          </h2>
+          <CidadeFilter leads={cadencia} value={cidadeFilter} onChange={setCidadeFilter} />
+        </div>
         <div className="flex items-center gap-2">
           <BatchResearch onComplete={loadFocoData} />
           <Button variant="ghost" size="sm" onClick={loadFocoData} disabled={loading}>
@@ -109,7 +118,7 @@ function SdrFocoView() {
 
       {loading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-      ) : cadencia.length === 0 ? (
+      ) : filteredCadencia.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground border border-dashed border-border rounded-lg">
           <CalendarCheck className="h-10 w-10 mx-auto mb-3 opacity-40" />
           <p className="font-medium">Nenhuma tarefa pendente!</p>
@@ -117,7 +126,7 @@ function SdrFocoView() {
         </div>
       ) : (
         <div className="space-y-2">
-          {cadencia.map((lead) => {
+          {filteredCadencia.map((lead) => {
             const step = CADENCE_STEPS[lead.dia_cadencia] || `Passo ${lead.dia_cadencia + 1}`;
             const isOverdue = lead.data_proximo_passo && new Date(lead.data_proximo_passo) < new Date();
             return (
@@ -145,16 +154,16 @@ function SdrFocoView() {
       )}
 
       {/* Completed Today */}
-      {!loading && concluidas.length > 0 && (
+      {!loading && filteredConcluidas.length > 0 && (
         <Collapsible open={showConcluidas} onOpenChange={setShowConcluidas}>
           <CollapsibleTrigger className="flex items-center gap-2 w-full text-left py-2">
             <CheckCircle2 className="h-4 w-4 text-success" />
             <span className="text-sm font-semibold text-foreground">Concluídas Hoje</span>
-            <span className="text-xs text-muted-foreground">({concluidas.length})</span>
+            <span className="text-xs text-muted-foreground">({filteredConcluidas.length})</span>
             <span className="text-xs text-muted-foreground ml-auto">{showConcluidas ? "▾" : "▸"}</span>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-2">
-            {concluidas.map((lead) => {
+            {filteredConcluidas.map((lead) => {
               const step = CADENCE_STEPS[lead.dia_cadencia] || `Passo ${lead.dia_cadencia + 1}`;
               return (
                 <div key={lead.id} className="rounded-lg border border-border bg-card/50 p-3 flex items-center gap-3 opacity-70">
@@ -177,16 +186,16 @@ function SdrFocoView() {
       )}
 
       {/* Tomorrow's Tasks */}
-      {!loading && amanha.length > 0 && (
+      {!loading && filteredAmanha.length > 0 && (
         <Collapsible open={showAmanha} onOpenChange={setShowAmanha}>
           <CollapsibleTrigger className="flex items-center gap-2 w-full text-left py-2">
             <CalendarClock className="h-4 w-4 text-primary" />
             <span className="text-sm font-semibold text-foreground">Amanhã</span>
-            <span className="text-xs text-muted-foreground">({amanha.length})</span>
+            <span className="text-xs text-muted-foreground">({filteredAmanha.length})</span>
             <span className="text-xs text-muted-foreground ml-auto">{showAmanha ? "▾" : "▸"}</span>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-2">
-            {amanha.map((lead) => {
+            {filteredAmanha.map((lead) => {
               const step = CADENCE_STEPS[lead.dia_cadencia] || `Passo ${lead.dia_cadencia + 1}`;
               return (
                 <div key={lead.id} className="rounded-lg border border-dashed border-border bg-card/30 p-3 flex items-center gap-3">
