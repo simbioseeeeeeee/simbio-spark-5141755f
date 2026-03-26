@@ -119,15 +119,13 @@ export function BatchResearch({ cidade, onComplete }: Props) {
         }
 
         // Insert research activity with sdr_id
-        const insertData: Record<string, unknown> = {
+        const { error: actErr } = await supabase.from("atividades").insert({
           lead_id: lead.id,
           tipo_atividade: "Pesquisa",
           resultado: "Pesquisa Concluída",
           nota: `Pesquisa IA em lote — Score: ${score}`,
-        };
-        if (userId) insertData.sdr_id = userId;
-
-        const { error: actErr } = await supabase.from("atividades").insert(insertData);
+          sdr_id: userId || null,
+        });
         if (actErr) {
           console.warn(`[BatchResearch] Erro ao inserir atividade para "${name}":`, actErr.message);
         }
