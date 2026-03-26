@@ -114,7 +114,7 @@ export const ESTAGIO_COLORS: Record<EstagioFunil, string> = {
 
 // Cadence step definitions (day -> action description)
 export const CADENCE_STEPS: Record<number, string> = {
-  0: "Pesquisar Lead",
+  0: "Primeira Tentativa de Contato",
   1: "Enviar WhatsApp #1",
   2: "Ligar para o Lead",
   3: "Enviar WhatsApp #2",

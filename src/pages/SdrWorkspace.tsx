@@ -4,7 +4,7 @@ import { getCadenciaHoje, getCadenciaConcluidasHoje, getCadenciaAmanha, getDaily
 import { useAuth } from "@/contexts/AuthContext";
 import { ActivityModal } from "@/components/ActivityModal";
 import { LeadProfile } from "@/components/LeadProfile";
-import { BatchResearch } from "@/components/BatchResearch";
+
 import { LeadExplorer } from "@/components/LeadExplorer";
 import { NewLeadModal } from "@/components/NewLeadModal";
 import { AppLayout } from "@/components/AppLayout";
@@ -109,7 +109,6 @@ function SdrFocoView() {
           <CidadeFilter leads={cadencia} value={cidadeFilter} onChange={setCidadeFilter} />
         </div>
         <div className="flex items-center gap-2">
-          <BatchResearch onComplete={loadFocoData} />
           <Button variant="ghost" size="sm" onClick={loadFocoData} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
           </Button>
