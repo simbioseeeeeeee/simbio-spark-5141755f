@@ -275,12 +275,34 @@ function AnalyticsView({ territorio }: { territorio: string }) {
       setPipeline(p);
       setActBreakdown(ab);
       setSdrPerf(sp);
+
+      // Snapshot today's KPIs and check alerts
+      try {
+        await supabase.rpc("snapshot_daily_kpis" as any, { p_cidade: cidade });
+        const { data: alertData } = await supabase.rpc("get_kpi_alerts" as any, {
+          p_cidade: cidade,
+          p_target_leads: dailyTargets.leads,
+          p_target_atividades: dailyTargets.atividades,
+          p_target_reunioes: dailyTargets.reunioes,
+          p_target_fechamentos: dailyTargets.fechamentos,
+          p_target_pipeline: dailyTargets.pipeline,
+        });
+        if (alertData && (alertData as any[]).length > 0) {
+          setKpiAlerts((alertData as any[]).map((r: any) => ({
+            kpi_name: r.kpi_name,
+            consecutive_days: Number(r.consecutive_days),
+          })));
+          setAlertsDismissed(false);
+        } else {
+          setKpiAlerts([]);
+        }
+      } catch { /* non-critical */ }
     } catch (err: any) {
       toast({ title: "Erro ao carregar analytics", description: err.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  }, [territorio, period]);
+  }, [territorio, period, dailyTargets]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
