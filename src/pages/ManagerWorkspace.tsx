@@ -755,7 +755,7 @@ function SdrCadenciaForManager() {
           <span className="text-muted-foreground font-normal">({cadencia.length} leads)</span>
         </h2>
         <div className="flex items-center gap-2">
-          <BatchResearch cidade={territorio} onComplete={loadData} />
+          <BatchResearch onComplete={loadData} />
           <Button variant="ghost" size="sm" onClick={loadData} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
           </Button>
