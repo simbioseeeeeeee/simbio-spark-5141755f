@@ -696,7 +696,7 @@ export default function ManagerWorkspace() {
 // Simplified cadencia view for Manager
 import { CADENCE_STEPS } from "@/types/lead";
 import { ActivityModal } from "@/components/ActivityModal";
-import { BatchResearch } from "@/components/BatchResearch";
+
 import { Crosshair, Search, Phone, MessageSquare, Bot } from "lucide-react";
 
 function SdrCadenciaForManager() {
