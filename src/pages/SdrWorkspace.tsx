@@ -4,7 +4,7 @@ import { getCadenciaHoje, getCadenciaConcluidasHoje, getCadenciaAmanha, getDaily
 import { useAuth } from "@/contexts/AuthContext";
 import { ActivityModal } from "@/components/ActivityModal";
 import { LeadProfile } from "@/components/LeadProfile";
-import { BatchResearch } from "@/components/BatchResearch";
+
 import { LeadExplorer } from "@/components/LeadExplorer";
 import { NewLeadModal } from "@/components/NewLeadModal";
 import { AppLayout } from "@/components/AppLayout";
