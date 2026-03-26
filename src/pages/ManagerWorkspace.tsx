@@ -778,7 +778,7 @@ function SdrCadenciaForManager() {
         </div>
       ) : (
         <div className="space-y-2">
-          {cadencia.map((lead) => {
+          {filteredCadencia.map((lead) => {
             const step = CADENCE_STEPS[lead.dia_cadencia] || `Passo ${lead.dia_cadencia + 1}`;
             const isOverdue = lead.data_proximo_passo && new Date(lead.data_proximo_passo) < new Date();
             return (
