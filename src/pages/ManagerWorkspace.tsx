@@ -705,6 +705,9 @@ function SdrCadenciaForManager() {
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [activityLead, setActivityLead] = useState<Lead | null>(null);
+  const [cidadeFilter, setCidadeFilter] = useState("__all__");
+
+  const filteredCadencia = useMemo(() => filterByCidade(cadencia, cidadeFilter), [cadencia, cidadeFilter]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
