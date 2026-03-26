@@ -1,4 +1,4 @@
-export type LeadStatus = "A Contatar" | "Em Qualificação" | "Reunião Agendada" | "Desqualificado";
+export type LeadStatus = "A Contatar" | "Em Qualificação" | "Reunião Agendada" | "Desqualificado" | "Desqualificado - Sem Perfil";
 
 export type EstagioFunil = "Reunião Agendada" | "Reunião Realizada" | "Proposta Enviada" | "Em Negociação" | "Fechado Ganho" | "Fechado Perdido";
 
