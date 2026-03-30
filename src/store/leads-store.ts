@@ -51,9 +51,19 @@ function rowToLead(row: any): Lead {
 
 // ─── Territory ───────────────────────────────────────────────
 export async function getDistinctCidades(): Promise<string[]> {
-  const { data, error } = await supabase.rpc("distinct_cidades");
-  if (error) throw error;
-  return (data || []).map((r: any) => r.cidade);
+  // RPC has default 1000 row limit — fetch all cities in batches
+  const all: string[] = [];
+  let offset = 0;
+  const batchSize = 1000;
+  while (true) {
+    const { data, error } = await supabase.rpc("distinct_cidades").range(offset, offset + batchSize - 1);
+    if (error) throw error;
+    const batch = (data || []).map((r: any) => r.cidade);
+    all.push(...batch);
+    if (batch.length < batchSize) break;
+    offset += batchSize;
+  }
+  return all;
 }
 
 // ─── Daily Metrics ───────────────────────────────────────────
