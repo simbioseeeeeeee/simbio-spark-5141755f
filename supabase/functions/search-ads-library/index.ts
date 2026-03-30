@@ -51,6 +51,7 @@ Deno.serve(async (req) => {
     const searches = await Promise.all(
       searchTerms.map(async (term) => {
         try {
+          console.log('Firecrawl search term:', term);
           const res = await fetch('https://api.firecrawl.dev/v1/search', {
             method: 'POST',
             headers: {
@@ -60,7 +61,11 @@ Deno.serve(async (req) => {
             body: JSON.stringify({ query: term, limit: 10, lang: 'pt-br', country: 'BR' }),
           });
           const data = await res.json();
-          return data?.data || [];
+          console.log('Firecrawl response status:', res.status, 'data keys:', Object.keys(data), 'results:', data?.data?.length ?? data?.results?.length ?? 0);
+          if (!res.ok) {
+            console.error('Firecrawl error body:', JSON.stringify(data).slice(0, 500));
+          }
+          return data?.data || data?.results || [];
         } catch (e) {
           console.error('Firecrawl search error:', e);
           return [];
