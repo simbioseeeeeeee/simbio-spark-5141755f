@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Lead } from "@/types/lead";
 import { LeadProfile } from "@/components/LeadProfile";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Search, Megaphone, ExternalLink, CheckCircle2, XCircle, ArrowRight, UserPlus, Clock, BarChart3 } from "lucide-react";
+import { Loader2, Search, Megaphone, ExternalLink, CheckCircle2, XCircle, ArrowRight, UserPlus, Clock, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 interface AdResult {
