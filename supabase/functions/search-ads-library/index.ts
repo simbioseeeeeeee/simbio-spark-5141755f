@@ -20,16 +20,38 @@ interface AdResult {
   meses_ativo: number;
 }
 
+// ── Expand CNPJ into multiple search variants ──
+function expandSearchTerms(terms: string[]): string[] {
+  const expanded: string[] = [];
+  for (const term of terms) {
+    const digits = term.replace(/\D/g, '');
+    // If it looks like a CNPJ (11-14 digits), try multiple formats
+    if (digits.length >= 11 && digits.length <= 14) {
+      expanded.push(term);          // original formatted
+      expanded.push(digits);        // all digits
+      expanded.push(digits.slice(0, 8)); // root (first 8 digits)
+    } else {
+      expanded.push(term);
+    }
+  }
+  // Deduplicate
+  return [...new Set(expanded)];
+}
+
 // ── Try Meta Ads Library API ──
 async function tryMetaApi(searchTerms: string[], locationPart: string): Promise<AdResult[] | null> {
   const metaToken = Deno.env.get('META_ACCESS_TOKEN');
   if (!metaToken) return null;
 
+  const allTerms = expandSearchTerms(searchTerms);
+  console.log('Meta API search variants:', allTerms);
+
   const allAds: any[] = [];
-  for (const term of searchTerms.slice(0, 3)) {
-    const q = locationPart ? `${term} ${locationPart}` : term;
+  const seenIds = new Set<string>();
+
+  for (const term of allTerms.slice(0, 6)) {
     const params = new URLSearchParams({
-      search_terms: q,
+      search_terms: term,
       ad_reached_countries: '["BR"]',
       ad_active_status: 'ALL',
       fields: 'page_name,page_id,ad_creation_time,ad_delivery_start_time,ad_delivery_stop_time,ad_snapshot_url',
@@ -40,9 +62,19 @@ async function tryMetaApi(searchTerms: string[], locationPart: string): Promise<
       const res = await fetch(`https://graph.facebook.com/v22.0/ads_archive?${params}`);
       const data = await res.json();
       if (!res.ok) { console.error('Meta API err:', data?.error?.message); return null; }
-      allAds.push(...(data?.data || []));
+      for (const ad of (data?.data || [])) {
+        const uid = ad.id ?? `${ad.page_id}-${ad.ad_creation_time}`;
+        if (!seenIds.has(uid)) { seenIds.add(uid); allAds.push(ad); }
+      }
       if (data?.paging?.next && allAds.length < 800) {
-        try { const r2 = await fetch(data.paging.next); const d2 = await r2.json(); if (r2.ok) allAds.push(...(d2?.data || [])); } catch(_){}
+        try {
+          const r2 = await fetch(data.paging.next);
+          const d2 = await r2.json();
+          if (r2.ok) for (const ad of (d2?.data || [])) {
+            const uid = ad.id ?? `${ad.page_id}-${ad.ad_creation_time}`;
+            if (!seenIds.has(uid)) { seenIds.add(uid); allAds.push(ad); }
+          }
+        } catch(_){}
       }
     } catch { return null; }
   }
