@@ -20,101 +20,12 @@ interface AdResult {
   meses_ativo: number;
 }
 
-// ── Expand CNPJ into multiple search variants ──
-function expandSearchTerms(terms: string[]): string[] {
-  const expanded: string[] = [];
-  for (const term of terms) {
-    const digits = term.replace(/\D/g, '');
-    // If it looks like a CNPJ (11-14 digits), try multiple formats
-    if (digits.length >= 11 && digits.length <= 14) {
-      expanded.push(term);          // original formatted
-      expanded.push(digits);        // all digits
-      expanded.push(digits.slice(0, 8)); // root (first 8 digits)
-    } else {
-      expanded.push(term);
-    }
-  }
-  // Deduplicate
-  return [...new Set(expanded)];
-}
-
-// ── Try Meta Ads Library API ──
-async function tryMetaApi(searchTerms: string[], locationPart: string): Promise<AdResult[] | null> {
-  const metaToken = Deno.env.get('META_ACCESS_TOKEN');
-  if (!metaToken) return null;
-
-  const allTerms = expandSearchTerms(searchTerms);
-  console.log('Meta API search variants:', allTerms);
-
-  const allAds: any[] = [];
-  const seenIds = new Set<string>();
-
-  for (const term of allTerms.slice(0, 6)) {
-    const params = new URLSearchParams({
-      search_terms: term,
-      ad_reached_countries: '["BR"]',
-      ad_active_status: 'ALL',
-      fields: 'page_name,page_id,ad_creation_time,ad_delivery_start_time,ad_delivery_stop_time,ad_snapshot_url',
-      limit: '500',
-      access_token: metaToken,
-    });
-    try {
-      const res = await fetch(`https://graph.facebook.com/v22.0/ads_archive?${params}`);
-      const data = await res.json();
-      if (!res.ok) { console.error('Meta API err:', data?.error?.message); return null; }
-      for (const ad of (data?.data || [])) {
-        const uid = ad.id ?? `${ad.page_id}-${ad.ad_creation_time}`;
-        if (!seenIds.has(uid)) { seenIds.add(uid); allAds.push(ad); }
-      }
-      if (data?.paging?.next && allAds.length < 800) {
-        try {
-          const r2 = await fetch(data.paging.next);
-          const d2 = await r2.json();
-          if (r2.ok) for (const ad of (d2?.data || [])) {
-            const uid = ad.id ?? `${ad.page_id}-${ad.ad_creation_time}`;
-            if (!seenIds.has(uid)) { seenIds.add(uid); allAds.push(ad); }
-          }
-        } catch(_){}
-      }
-    } catch { return null; }
-  }
-  if (allAds.length === 0) return null;
-
-  const byPage: Record<string, { advertiser: string; page_id: string; count: number; first: Date; maxMonths: number; urls: string[] }> = {};
-  for (const ad of allAds) {
-    const key = ad.page_id || ad.page_name;
-    const start = new Date(ad.ad_delivery_start_time || ad.ad_creation_time || Date.now());
-    if (!byPage[key]) byPage[key] = { advertiser: ad.page_name || '?', page_id: ad.page_id || '', count: 0, first: start, maxMonths: 0, urls: [] };
-    const e = byPage[key];
-    e.count++;
-    if (start < e.first) e.first = start;
-    const m = Math.max(1, Math.ceil((Date.now() - start.getTime()) / (30.44*864e5)));
-    if (m > e.maxMonths) e.maxMonths = m;
-    if (ad.ad_snapshot_url && e.urls.length < 2) e.urls.push(ad.ad_snapshot_url);
-  }
-
-  return Object.values(byPage).map(a => {
-    const vpm = Math.max(1, Math.ceil(a.count / Math.max(1, a.maxMonths)));
-    return {
-      anunciante: a.advertiser,
-      url_anuncio: a.urls[0] || `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=BR&view_all_page_id=${a.page_id}`,
-      descricao: `${a.count} anúncio(s). Ativo desde ${a.first.toISOString().slice(0,10)}.`,
-      plataforma: 'Meta Ads',
-      tempo_anunciando: a.maxMonths >= 12 ? `${Math.floor(a.maxMonths/12)} ano(s) e ${a.maxMonths%12} meses` : `${a.maxMonths} mês(es)`,
-      volume_estimado: `${a.count} total (~${vpm}/mês)`,
-      total_ads: a.count,
-      meses_ativo: a.maxMonths,
-    };
-  }).sort((a,b) => b.total_ads - a.total_ads);
-}
-
-// ── Fallback: Firecrawl + AI ──
-async function firecrawlFallback(searchTerms: string[], locationPart: string): Promise<AdResult[]> {
+// ── Firecrawl + AI search ──
+async function searchAds(searchTerms: string[], locationPart: string): Promise<AdResult[]> {
   const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
   const lovableKey = Deno.env.get('LOVABLE_API_KEY');
   if (!firecrawlKey || !lovableKey) throw new Error('API keys não configuradas');
 
-  // Also scrape the Ads Library search page directly for the first keyword
   const adsLibraryUrl = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=BR&q=${encodeURIComponent(searchTerms[0])}`;
 
   const terms: string[] = [];
@@ -126,7 +37,6 @@ async function firecrawlFallback(searchTerms: string[], locationPart: string): P
     terms.push(`empreendimento imobiliário "${locationPart}" anúncio facebook meta ads`);
   }
 
-  // Run Firecrawl searches + direct Ads Library scrape in parallel
   const [searchResults, adsLibraryScrape] = await Promise.all([
     Promise.all(terms.slice(0, 5).map(async (term) => {
       try {
@@ -139,7 +49,6 @@ async function firecrawlFallback(searchTerms: string[], locationPart: string): P
         return d?.data || d?.results || [];
       } catch { return []; }
     })),
-    // Direct scrape of Ads Library
     (async () => {
       try {
         const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
@@ -259,11 +168,7 @@ Deno.serve(async (req) => {
 
     console.log('Search ads:', searchTerms, 'location:', locationPart);
 
-    let results = await tryMetaApi(searchTerms, locationPart);
-    if (!results || results.length === 0) {
-      console.log('Meta API unavailable, using Firecrawl fallback');
-      results = await firecrawlFallback(searchTerms, locationPart);
-    }
+    const results = await searchAds(searchTerms, locationPart);
 
     console.log('Final:', results.length, 'advertisers');
 
