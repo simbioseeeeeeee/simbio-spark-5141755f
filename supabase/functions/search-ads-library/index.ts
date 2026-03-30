@@ -20,25 +20,24 @@ interface AdResult {
   meses_ativo: number;
 }
 
-// ── Firecrawl + AI search ──
 async function searchAds(searchTerms: string[], locationPart: string): Promise<AdResult[]> {
   const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
   const lovableKey = Deno.env.get('LOVABLE_API_KEY');
   if (!firecrawlKey || !lovableKey) throw new Error('API keys não configuradas');
 
-  const adsLibraryUrl = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=BR&q=${encodeURIComponent(searchTerms[0])}`;
-
+  // Build search queries to find actual advertisers (not articles about advertising)
   const terms: string[] = [];
   for (const kw of searchTerms) {
-    terms.push(`"${kw}" imobiliária anúncio facebook ads library ${locationPart}`.trim());
-    terms.push(`"${kw}" construtora tráfego pago meta ads ${locationPart}`.trim());
-  }
-  if (locationPart) {
-    terms.push(`empreendimento imobiliário "${locationPart}" anúncio facebook meta ads`);
+    terms.push(`site:facebook.com/ads/library "${kw}"`);
+    terms.push(`"${kw}" "pago por" construtora incorporadora imobiliária ${locationPart}`.trim());
+    terms.push(`"${kw}" empreendimento "minha casa" anúncio ativo ${locationPart}`.trim());
+    terms.push(`"${kw}" construtora lançamento imobiliário facebook instagram ${locationPart}`.trim());
   }
 
-  const [searchResults, adsLibraryScrape] = await Promise.all([
-    Promise.all(terms.slice(0, 5).map(async (term) => {
+  // Run searches in parallel (max 4 to avoid rate limits)
+  console.log('Starting Firecrawl searches:', terms.length, 'terms');
+  const searchResults = await Promise.all(
+    terms.slice(0, 4).map(async (term) => {
       try {
         const res = await fetch('https://api.firecrawl.dev/v1/search', {
           method: 'POST',
@@ -47,34 +46,25 @@ async function searchAds(searchTerms: string[], locationPart: string): Promise<A
         });
         const d = await res.json();
         return d?.data || d?.results || [];
-      } catch { return []; }
-    })),
-    (async () => {
-      try {
-        const res = await fetch('https://api.firecrawl.dev/v1/scrape', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${firecrawlKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: adsLibraryUrl, formats: ['markdown'], waitFor: 5000 }),
-        });
-        const d = await res.json();
-        return d?.data?.markdown || d?.markdown || '';
-      } catch { return ''; }
-    })(),
-  ]);
+      } catch (e) {
+        console.error('Search error:', e);
+        return [];
+      }
+    })
+  );
 
   const allResults: any[] = [];
   searchResults.forEach(r => allResults.push(...r));
-  console.log('Firecrawl raw:', allResults.length, 'Ads Library scrape len:', adsLibraryScrape.length);
+  console.log('Firecrawl total results:', allResults.length);
 
-  if (allResults.length === 0 && !adsLibraryScrape) return [];
+  if (allResults.length === 0) return [];
 
+  // Build context for AI - include more content per result
   const summary = allResults
-    .map((r: any, i: number) => `[${i+1}] ${r.url || ''} | ${r.title || ''} | ${(r.markdown || '').slice(0, 400)}`)
-    .join('\n---\n');
+    .map((r: any, i: number) => `[${i + 1}] URL: ${r.url || ''}\nTitle: ${r.title || ''}\nContent: ${(r.markdown || r.description || r.snippet || '').slice(0, 800)}`)
+    .join('\n\n===\n\n');
 
-  const adsLibrarySection = adsLibraryScrape
-    ? `\n\n=== DADOS DIRETOS DA META ADS LIBRARY ===\n${adsLibraryScrape.slice(0, 3000)}\n=== FIM ===`
-    : '';
+  console.log('Sending to AI, context length:', summary.length);
 
   const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -84,22 +74,27 @@ async function searchAds(searchTerms: string[], locationPart: string): Promise<A
       messages: [
         {
           role: 'system',
-          content: `Você é um extrator de dados especializado em anunciantes da Meta Ads Library.
-Analise os resultados e extraia ANUNCIANTES REAIS (imobiliárias, construtoras, corretores) que anunciam sobre: ${searchTerms.join(', ')}.
+          content: `Você extrai nomes de empresas anunciantes a partir de resultados de busca sobre anúncios no Facebook/Instagram.
+
+TAREFA: Analise os textos e extraia TODAS as empresas que aparecem como anunciantes (quem paga pelos anúncios).
+Foco: imobiliárias, construtoras, incorporadoras, corretores, assessorias imobiliárias que anunciam sobre: ${searchTerms.join(', ')}.
 
 REGRAS:
-- NÃO invente nomes. Só liste empresas mencionadas nos textos.
-- Para total_ads: conte quantos anúncios são mencionados para aquele anunciante. Se não souber, coloque 0.
-- Para meses_ativo: calcule quantos meses desde a data mais antiga mencionada até hoje (${new Date().toISOString().slice(0,10)}). Se não souber, coloque 0.
-- Se a seção "DADOS DIRETOS DA META ADS LIBRARY" estiver presente, USE-A como fonte primária — ela contém dados reais de anunciantes ativos.`,
+- Extraia o MÁXIMO de empresas distintas possível.
+- Só extraia nomes que estejam EXPLICITAMENTE nos textos.
+- NÃO invente nomes.
+- Se vir "Pago por" ou "page_name" ou nome de página do Facebook, use como nome do anunciante.
+- total_ads: quantos anúncios distintos são mencionados para essa empresa (0 se não souber).
+- meses_ativo: meses desde a data mais antiga mencionada até ${new Date().toISOString().slice(0, 10)} (0 se não souber).
+- Inclua a URL do anúncio ou da página se disponível.`,
         },
-        { role: 'user', content: `Extraia anunciantes:\n\n${summary}${adsLibrarySection}` },
+        { role: 'user', content: summary },
       ],
       tools: [{
         type: 'function' as const,
         function: {
           name: 'report_advertisers',
-          description: 'Lista anunciantes encontrados com métricas.',
+          description: 'Report all advertisers found in the search results.',
           parameters: {
             type: 'object',
             properties: {
@@ -108,18 +103,17 @@ REGRAS:
                 items: {
                   type: 'object',
                   properties: {
-                    nome: { type: 'string', description: 'Nome da empresa' },
-                    url_anuncio: { type: ['string', 'null'], description: 'URL do anúncio ou página' },
-                    descricao: { type: 'string', description: 'Descrição breve' },
-                    total_ads: { type: 'number', description: 'Número de anúncios encontrados (0 se desconhecido)' },
-                    meses_ativo: { type: 'number', description: 'Meses anunciando (0 se desconhecido)' },
+                    nome: { type: 'string' },
+                    url_anuncio: { type: 'string' },
+                    descricao: { type: 'string' },
+                    total_ads: { type: 'number' },
+                    meses_ativo: { type: 'number' },
                   },
                   required: ['nome', 'descricao', 'total_ads', 'meses_ativo'],
                 },
               },
             },
             required: ['anunciantes'],
-            additionalProperties: false,
           },
         },
       }],
@@ -127,15 +121,34 @@ REGRAS:
     }),
   });
 
-  if (!aiRes.ok) { console.error('AI err:', aiRes.status); return []; }
+  if (!aiRes.ok) {
+    const errText = await aiRes.text();
+    console.error('AI error:', aiRes.status, errText.slice(0, 300));
+    return [];
+  }
 
   const aiData = await aiRes.json();
-  const tc = aiData.choices?.[0]?.message?.tool_calls?.[0];
-  if (!tc) return [];
+  const msg = aiData.choices?.[0]?.message;
+  console.log('AI finish_reason:', aiData.choices?.[0]?.finish_reason, 'tool_calls:', msg?.tool_calls?.length || 0);
 
-  const parsed = JSON.parse(tc.function.arguments);
+  const tc = msg?.tool_calls?.[0];
+  if (!tc) {
+    console.log('No tool call. Content:', (msg?.content || '').slice(0, 300));
+    return [];
+  }
 
-  return (parsed.anunciantes || []).map((a: any) => {
+  let parsed: any;
+  try {
+    parsed = JSON.parse(tc.function.arguments);
+  } catch (e) {
+    console.error('JSON parse failed:', (tc.function.arguments || '').slice(0, 300));
+    return [];
+  }
+
+  const anunciantes = parsed.anunciantes || [];
+  console.log('Extracted advertisers:', anunciantes.length);
+
+  return anunciantes.map((a: any) => {
     const totalAds = a.total_ads || 0;
     const mesesAtivo = a.meses_ativo || 0;
     const vpm = mesesAtivo > 0 ? Math.max(1, Math.ceil(totalAds / mesesAtivo)) : 0;
@@ -146,7 +159,7 @@ REGRAS:
       descricao: a.descricao || '',
       plataforma: 'Meta Ads',
       tempo_anunciando: mesesAtivo > 0
-        ? (mesesAtivo >= 12 ? `${Math.floor(mesesAtivo/12)} ano(s) e ${mesesAtivo%12} meses` : `${mesesAtivo} mês(es)`)
+        ? (mesesAtivo >= 12 ? `${Math.floor(mesesAtivo / 12)} ano(s) e ${mesesAtivo % 12} meses` : `${mesesAtivo} mês(es)`)
         : 'desconhecido',
       volume_estimado: totalAds > 0 ? `${totalAds} total (~${vpm}/mês)` : 'desconhecido',
       total_ads: totalAds,
