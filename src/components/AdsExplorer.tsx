@@ -92,6 +92,7 @@ export function AdsExplorer() {
   const searchAds = useCallback(async () => {
     setLoading(true);
     setResults([]);
+    setPage(0);
     try {
       // Support both "MCMV" and full name as keywords
       const keywords = ["minha casa minha vida", "MCMV"];
