@@ -6,6 +6,7 @@ import { ActivityModal } from "@/components/ActivityModal";
 import { LeadProfile } from "@/components/LeadProfile";
 
 import { LeadExplorer } from "@/components/LeadExplorer";
+import { AdsExplorer } from "@/components/AdsExplorer";
 import { NewLeadModal } from "@/components/NewLeadModal";
 import { AppLayout } from "@/components/AppLayout";
 import { TerritorySelector } from "@/components/TerritorySelector";
