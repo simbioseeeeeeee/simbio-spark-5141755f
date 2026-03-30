@@ -69,12 +69,14 @@ async function searchAds(searchTerms: string[], locationPart: string): Promise<A
   if (allResults.length === 0 && !adsLibraryScrape) return [];
 
   const summary = allResults
-    .map((r: any, i: number) => `[${i+1}] ${r.url || ''} | ${r.title || ''} | ${(r.markdown || '').slice(0, 400)}`)
+    .map((r: any, i: number) => `[${i+1}] ${r.url || ''} | ${r.title || ''} | ${(r.markdown || r.description || r.snippet || '').slice(0, 600)}`)
     .join('\n---\n');
 
   const adsLibrarySection = adsLibraryScrape
-    ? `\n\n=== DADOS DIRETOS DA META ADS LIBRARY ===\n${adsLibraryScrape.slice(0, 3000)}\n=== FIM ===`
+    ? `\n\n=== DADOS DIRETOS DA META ADS LIBRARY ===\n${adsLibraryScrape.slice(0, 15000)}\n=== FIM ===`
     : '';
+
+  console.log('AI input length:', summary.length + adsLibrarySection.length);
 
   const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -84,16 +86,21 @@ async function searchAds(searchTerms: string[], locationPart: string): Promise<A
       messages: [
         {
           role: 'system',
-          content: `Você é um extrator de dados especializado em anunciantes da Meta Ads Library.
-Analise os resultados e extraia ANUNCIANTES REAIS (imobiliárias, construtoras, corretores) que anunciam sobre: ${searchTerms.join(', ')}.
+          content: `Você é um extrator de dados especializado em encontrar empresas que fazem anúncios pagos no Facebook/Instagram (Meta Ads).
 
-REGRAS:
-- NÃO invente nomes. Só liste empresas mencionadas nos textos.
-- Para total_ads: conte quantos anúncios são mencionados para aquele anunciante. Se não souber, coloque 0.
-- Para meses_ativo: calcule quantos meses desde a data mais antiga mencionada até hoje (${new Date().toISOString().slice(0,10)}). Se não souber, coloque 0.
-- Se a seção "DADOS DIRETOS DA META ADS LIBRARY" estiver presente, USE-A como fonte primária — ela contém dados reais de anunciantes ativos.`,
+Analise TODOS os textos fornecidos e extraia o MÁXIMO de empresas/anunciantes que você encontrar relacionados a: ${searchTerms.join(', ')}.
+
+INSTRUÇÕES:
+1. Extraia QUALQUER empresa mencionada nos textos que esteja anunciando ou sendo referenciada como anunciante.
+2. Inclua: imobiliárias, construtoras, corretores, incorporadoras, empresas de financiamento, assessorias, qualquer empresa do setor imobiliário.
+3. Também inclua empresas que aparecem como "page_name" ou "anunciante" nos dados da Ads Library.
+4. NÃO invente nomes — só extraia o que está explicitamente nos textos.
+5. Se um nome de empresa aparecer múltiplas vezes, conte cada menção como um anúncio para total_ads.
+6. Para meses_ativo: se houver datas, calcule a diferença até hoje (${new Date().toISOString().slice(0,10)}). Senão, coloque 0.
+7. Tente extrair o MÁXIMO possível de anunciantes — quanto mais, melhor.
+8. Na seção "DADOS DIRETOS DA META ADS LIBRARY", cada bloco separado geralmente representa um anunciante diferente. Extraia TODOS.`,
         },
-        { role: 'user', content: `Extraia anunciantes:\n\n${summary}${adsLibrarySection}` },
+        { role: 'user', content: `Extraia TODOS os anunciantes encontrados:\n\n${summary}${adsLibrarySection}` },
       ],
       tools: [{
         type: 'function' as const,
