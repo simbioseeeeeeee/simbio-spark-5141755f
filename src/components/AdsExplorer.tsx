@@ -73,6 +73,17 @@ export function AdsExplorer() {
   const [results, setResults] = useState<AdResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [filterHighPerformance, setFilterHighPerformance] = useState(false);
+
+  const filteredResults = filterHighPerformance
+    ? results.filter((ad) => {
+        const tempo = (ad.tempo_anunciando || "").toLowerCase();
+        const volume = (ad.volume_estimado || "").toLowerCase();
+        const longRunning = /(?:3|4|5|6|7|8|9|\d{2,})\s*mes|mais de [3-9]|more than [3-9]|6\+|ano|year/i.test(tempo);
+        const highVolume = /(?:2[0-9]|[3-9]\d|\d{3,})\+?|20\+|alto|high/i.test(volume);
+        return longRunning || highVolume;
+      })
+    : results;
 
   const searchAds = useCallback(async () => {
     setLoading(true);
@@ -203,7 +214,7 @@ export function AdsExplorer() {
             Pesquisar
           </Button>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           <Badge variant="outline" className="text-xs">MCMV</Badge>
           <Badge variant="outline" className="text-xs">minha casa minha vida</Badge>
           {cidade && <Badge variant="outline" className="text-xs">{cidade}</Badge>}
@@ -213,6 +224,22 @@ export function AdsExplorer() {
       {/* Results */}
       {results.length > 0 && (
         <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+            <span className="text-xs text-muted-foreground">
+              {filterHighPerformance
+                ? `${filteredResults.length} de ${results.length} anunciante(s) com alta performance`
+                : `${results.length} anunciante(s)`}
+            </span>
+            <Button
+              size="sm"
+              variant={filterHighPerformance ? "default" : "outline"}
+              className="gap-1.5 text-xs h-7"
+              onClick={() => setFilterHighPerformance((v) => !v)}
+            >
+              <BarChart3 className="h-3 w-3" />
+              3+ meses / 20+ anúncios
+            </Button>
+          </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -230,7 +257,9 @@ export function AdsExplorer() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {results.map((ad, i) => (
+              {filteredResults.map((ad) => {
+                const i = results.indexOf(ad);
+                return (
                   <TableRow key={i}>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -291,7 +320,8 @@ export function AdsExplorer() {
                       ) : null}
                     </TableCell>
                   </TableRow>
-                ))}
+                );
+              })}
               </TableBody>
             </Table>
           </div>
