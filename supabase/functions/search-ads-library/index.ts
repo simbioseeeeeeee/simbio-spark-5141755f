@@ -4,19 +4,19 @@ const corsHeaders = {
 };
 
 interface SearchRequest {
-  query?: string;
+  keywords?: string[];
   cidade?: string;
   uf?: string;
-  keywords?: string[];
 }
 
-interface AdResult {
-  anunciante: string;
-  url_anuncio: string;
-  descricao: string;
-  plataforma: string;
-  tempo_anunciando?: string;
-  volume_estimado?: string;
+interface AdvertiserAgg {
+  advertiser: string;
+  page_id: string;
+  count: number;
+  first: Date;
+  last: Date;
+  maxMonths: number;
+  urls: string[];
 }
 
 Deno.serve(async (req) => {
@@ -25,183 +25,144 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { query, cidade, uf, keywords } = await req.json() as SearchRequest;
+    const { keywords, cidade, uf } = await req.json() as SearchRequest;
 
-    const firecrawlKey = Deno.env.get('FIRECRAWL_API_KEY');
-    const lovableKey = Deno.env.get('LOVABLE_API_KEY');
-
-    if (!firecrawlKey || !lovableKey) {
+    const metaToken = Deno.env.get('META_ACCESS_TOKEN');
+    if (!metaToken) {
       return new Response(
-        JSON.stringify({ success: false, error: 'API keys não configuradas' }),
+        JSON.stringify({ success: false, error: 'META_ACCESS_TOKEN não configurado' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    // Support multiple keywords
-    const searchKeywords = keywords?.length
-      ? keywords
-      : [query || 'minha casa minha vida'];
-
+    const searchTerms = keywords?.length ? keywords : ['minha casa minha vida'];
     const locationPart = [cidade, uf].filter(Boolean).join(' ');
 
-    console.log('Searching Ads Library for keywords:', searchKeywords, 'location:', locationPart);
+    console.log('Meta Ads Library search:', searchTerms, 'location:', locationPart);
 
-    const allResults: any[] = [];
+    const allAds: any[] = [];
 
-    // Build search terms from all keywords
-    const searchTerms: string[] = [];
-    for (const kw of searchKeywords) {
-      searchTerms.push(
-        `"${kw}" imobiliária anúncio facebook ads library ${locationPart}`.trim(),
-        `"${kw}" construtora tráfego pago meta ads ${locationPart}`.trim(),
-      );
-    }
+    // Query Meta Ads Library API for each keyword
+    for (const term of searchTerms.slice(0, 3)) {
+      const q = locationPart ? `${term} ${locationPart}` : term;
+      const params = new URLSearchParams({
+        search_terms: q,
+        ad_reached_countries: '["BR"]',
+        ad_active_status: 'ALL',
+        fields: 'page_name,page_id,ad_creation_time,ad_delivery_start_time,ad_delivery_stop_time,ad_snapshot_url',
+        limit: '500',
+        access_token: metaToken,
+      });
 
-    // Also add region/empreendimento searches if cidade is provided
-    if (cidade) {
-      searchTerms.push(
-        `empreendimento imobiliário "${cidade}" anúncio facebook meta ads`.trim(),
-        `lançamento imobiliário "${cidade}" construtora anúncio ${searchKeywords[0]}`.trim(),
-      );
-    }
+      const url = `https://graph.facebook.com/v22.0/ads_archive?${params.toString()}`;
+      console.log('Fetching Meta API for term:', term);
 
-    // Limit to 6 searches max to avoid rate limits
-    const limitedTerms = searchTerms.slice(0, 6);
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
 
-    const searches = await Promise.all(
-      limitedTerms.map(async (term) => {
-        try {
-          console.log('Firecrawl search term:', term);
-          const res = await fetch('https://api.firecrawl.dev/v1/search', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${firecrawlKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ query: term, limit: 10, lang: 'pt-br', country: 'BR' }),
-          });
-          const data = await res.json();
-          console.log('Firecrawl response status:', res.status, 'results:', data?.data?.length ?? data?.results?.length ?? 0);
-          if (!res.ok) {
-            console.error('Firecrawl error body:', JSON.stringify(data).slice(0, 500));
+        if (!res.ok) {
+          console.error('Meta API error:', JSON.stringify(data).slice(0, 500));
+          // If token is invalid, fail fast
+          if (res.status === 400 || res.status === 401) {
+            return new Response(
+              JSON.stringify({ success: false, error: `Erro na API Meta: ${data?.error?.message || res.status}` }),
+              { status: res.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+            );
           }
-          return data?.data || data?.results || [];
-        } catch (e) {
-          console.error('Firecrawl search error:', e);
-          return [];
+          continue;
         }
+
+        const ads = data?.data || [];
+        console.log(`Term "${term}": ${ads.length} ads found`);
+        allAds.push(...ads);
+
+        // Follow paging if available (up to 1 more page)
+        if (data?.paging?.next && allAds.length < 800) {
+          try {
+            const nextRes = await fetch(data.paging.next);
+            const nextData = await nextRes.json();
+            if (nextRes.ok && nextData?.data) {
+              allAds.push(...nextData.data);
+              console.log(`Paging: +${nextData.data.length} ads`);
+            }
+          } catch (e) {
+            console.error('Paging error:', e);
+          }
+        }
+      } catch (e) {
+        console.error('Fetch error for term:', term, e);
+      }
+    }
+
+    console.log('Total raw ads:', allAds.length);
+
+    if (allAds.length === 0) {
+      return new Response(
+        JSON.stringify({ success: true, data: [] }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // Aggregate by page (advertiser)
+    const byPage: Record<string, AdvertiserAgg> = {};
+
+    for (const ad of allAds) {
+      const key = ad.page_id || ad.page_name || 'unknown';
+      const start = new Date(ad.ad_delivery_start_time || ad.ad_creation_time || Date.now());
+      const stop = ad.ad_delivery_stop_time ? new Date(ad.ad_delivery_stop_time) : new Date();
+
+      if (!byPage[key]) {
+        byPage[key] = {
+          advertiser: ad.page_name || 'Desconhecido',
+          page_id: ad.page_id || '',
+          count: 0,
+          first: start,
+          last: stop,
+          maxMonths: 0,
+          urls: [],
+        };
+      }
+
+      const entry = byPage[key];
+      entry.count++;
+
+      if (start < entry.first) entry.first = start;
+      if (stop > entry.last) entry.last = stop;
+
+      // Calculate months this ad has been running
+      const months = Math.max(1, Math.ceil((Date.now() - start.getTime()) / (30.44 * 24 * 60 * 60 * 1000)));
+      if (months > entry.maxMonths) entry.maxMonths = months;
+
+      // Keep first ad URL
+      if (ad.ad_snapshot_url && entry.urls.length < 3) {
+        entry.urls.push(ad.ad_snapshot_url);
+      }
+    }
+
+    // Convert to result array, sorted by count desc
+    const results = Object.values(byPage)
+      .map((agg) => {
+        const volumePerMonth = Math.max(1, Math.ceil(agg.count / Math.max(1, agg.maxMonths)));
+        return {
+          anunciante: agg.advertiser,
+          url_anuncio: agg.urls[0] || `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=BR&view_all_page_id=${agg.page_id}`,
+          descricao: `${agg.count} anúncio(s) encontrado(s). Ativo desde ${agg.first.toISOString().slice(0, 10)}.`,
+          plataforma: 'Meta Ads',
+          tempo_anunciando: agg.maxMonths >= 12
+            ? `${Math.floor(agg.maxMonths / 12)} ano(s) e ${agg.maxMonths % 12} meses`
+            : `${agg.maxMonths} mês(es)`,
+          volume_estimado: `${agg.count} total (~${volumePerMonth}/mês)`,
+          total_ads: agg.count,
+          meses_ativo: agg.maxMonths,
+        };
       })
-    );
+      .sort((a, b) => b.total_ads - a.total_ads);
 
-    searches.forEach((results) => allResults.push(...results));
-    console.log('Total raw results:', allResults.length);
-
-    if (allResults.length === 0) {
-      return new Response(
-        JSON.stringify({ success: true, data: [] }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
-
-    const searchSummary = allResults
-      .map((r: any, i: number) =>
-        `[${i + 1}] URL: ${r.url || 'N/A'}\nTitle: ${r.title || 'N/A'}\nDescription: ${r.description || 'N/A'}\nContent: ${(r.markdown || '').slice(0, 600)}`,
-      )
-      .join('\n---\n');
-
-    const keywordsStr = searchKeywords.join(', ');
-
-    // Use AI to extract advertiser names with duration and volume info
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: `Você é um extrator de dados especializado em identificar anunciantes na Meta Ads Library.
-Analise os resultados de busca e extraia os NOMES DAS EMPRESAS/ANUNCIANTES que aparecem.
-Foque em imobiliárias, construtoras e corretores que estão anunciando sobre: ${keywordsStr}.
-Retorne APENAS empresas reais encontradas nos resultados. NÃO invente nomes.
-
-IMPORTANTE: Para cada anunciante, tente estimar:
-- tempo_anunciando: há quanto tempo o anúncio está rodando (ex: "mais de 3 meses", "1 mês", "recente"). Se não souber, coloque "desconhecido".
-- volume_estimado: quantidade estimada de anúncios ativos (ex: "20+", "10-20", "poucos"). Se não souber, coloque "desconhecido".
-
-Priorize anunciantes que parecem ter anúncios rodando há mais de 3 meses ou com alto volume (20+ anúncios).`,
-          },
-          {
-            role: 'user',
-            content: `Extraia os nomes dos anunciantes encontrados nos resultados abaixo:\n\n${searchSummary}`,
-          },
-        ],
-        tools: [{
-          type: 'function' as const,
-          function: {
-            name: 'report_advertisers',
-            description: 'Lista os anunciantes encontrados na busca da Meta Ads Library.',
-            parameters: {
-              type: 'object',
-              properties: {
-                anunciantes: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      nome: { type: 'string', description: 'Nome do anunciante/empresa' },
-                      url_anuncio: { type: ['string', 'null'], description: 'URL do anúncio na Ads Library' },
-                      descricao: { type: 'string', description: 'Breve descrição do que está anunciando' },
-                      tempo_anunciando: { type: 'string', description: 'Estimativa de tempo anunciando (ex: mais de 3 meses, recente, desconhecido)' },
-                      volume_estimado: { type: 'string', description: 'Estimativa de volume de anúncios (ex: 20+, 10-20, poucos, desconhecido)' },
-                    },
-                    required: ['nome', 'descricao'],
-                  },
-                },
-              },
-              required: ['anunciantes'],
-              additionalProperties: false,
-            },
-          },
-        }],
-        tool_choice: { type: 'function', function: { name: 'report_advertisers' } },
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      console.error('AI Gateway error:', aiResponse.status, errText);
-      throw new Error(`AI Gateway returned ${aiResponse.status}`);
-    }
-
-    const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-
-    if (!toolCall || toolCall.function.name !== 'report_advertisers') {
-      console.error('AI did not call expected tool:', JSON.stringify(aiData.choices?.[0]?.message));
-      return new Response(
-        JSON.stringify({ success: true, data: [] }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
-
-    const parsed = JSON.parse(toolCall.function.arguments);
-    const anunciantes: AdResult[] = (parsed.anunciantes || []).map((a: any) => ({
-      anunciante: a.nome || '',
-      url_anuncio: a.url_anuncio || '',
-      descricao: a.descricao || '',
-      plataforma: 'Meta Ads',
-      tempo_anunciando: a.tempo_anunciando || 'desconhecido',
-      volume_estimado: a.volume_estimado || 'desconhecido',
-    }));
-
-    console.log('Found advertisers:', anunciantes.length);
+    console.log('Unique advertisers:', results.length);
 
     return new Response(
-      JSON.stringify({ success: true, data: anunciantes }),
+      JSON.stringify({ success: true, data: results }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {
