@@ -134,13 +134,31 @@ INSTRUÇÕES:
     }),
   });
 
-  if (!aiRes.ok) { console.error('AI err:', aiRes.status); return []; }
+  if (!aiRes.ok) { 
+    const errText = await aiRes.text();
+    console.error('AI err:', aiRes.status, errText.slice(0, 500)); 
+    return []; 
+  }
 
   const aiData = await aiRes.json();
-  const tc = aiData.choices?.[0]?.message?.tool_calls?.[0];
-  if (!tc) return [];
+  const msg = aiData.choices?.[0]?.message;
+  console.log('AI finish_reason:', aiData.choices?.[0]?.finish_reason);
+  console.log('AI tool_calls count:', msg?.tool_calls?.length || 0);
+  
+  const tc = msg?.tool_calls?.[0];
+  if (!tc) {
+    console.log('AI content (no tool call):', (msg?.content || '').slice(0, 500));
+    return [];
+  }
 
-  const parsed = JSON.parse(tc.function.arguments);
+  let parsed: any;
+  try {
+    parsed = JSON.parse(tc.function.arguments);
+  } catch (e) {
+    console.error('JSON parse error:', (tc.function.arguments || '').slice(0, 500));
+    return [];
+  }
+  console.log('Parsed anunciantes count:', parsed.anunciantes?.length || 0);
 
   return (parsed.anunciantes || []).map((a: any) => {
     const totalAds = a.total_ads || 0;
