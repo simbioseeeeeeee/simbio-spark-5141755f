@@ -214,7 +214,7 @@ export function AdsExplorer() {
             Pesquisar
           </Button>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           <Badge variant="outline" className="text-xs">MCMV</Badge>
           <Badge variant="outline" className="text-xs">minha casa minha vida</Badge>
           {cidade && <Badge variant="outline" className="text-xs">{cidade}</Badge>}
@@ -224,6 +224,22 @@ export function AdsExplorer() {
       {/* Results */}
       {results.length > 0 && (
         <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+            <span className="text-xs text-muted-foreground">
+              {filterHighPerformance
+                ? `${filteredResults.length} de ${results.length} anunciante(s) com alta performance`
+                : `${results.length} anunciante(s)`}
+            </span>
+            <Button
+              size="sm"
+              variant={filterHighPerformance ? "default" : "outline"}
+              className="gap-1.5 text-xs h-7"
+              onClick={() => setFilterHighPerformance((v) => !v)}
+            >
+              <BarChart3 className="h-3 w-3" />
+              3+ meses / 20+ anúncios
+            </Button>
+          </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
