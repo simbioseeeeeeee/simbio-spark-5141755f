@@ -168,23 +168,29 @@ REGRAS GERAIS:
   console.log('Extracted advertisers:', anunciantes.length);
 
   return anunciantes.map((a: any) => {
-    const totalAds = a.total_ads || 0;
-    const mesesAtivo = a.meses_ativo || 0;
-    const vpm = mesesAtivo > 0 ? Math.max(1, Math.ceil(totalAds / mesesAtivo)) : 0;
+    const totalAds = a.total_ads ?? null;
+    const mesesAtivo = a.meses_ativo ?? null;
+    const confidence = a.confidence ?? 0;
+    const vpm = (totalAds && mesesAtivo && mesesAtivo > 0) ? Math.max(1, Math.ceil(totalAds / mesesAtivo)) : null;
 
     return {
       anunciante: a.nome || '',
       url_anuncio: a.url_anuncio || `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=BR&q=${encodeURIComponent(a.nome || '')}`,
       descricao: a.descricao || '',
       plataforma: 'Meta Ads',
-      tempo_anunciando: mesesAtivo > 0
+      tempo_anunciando: mesesAtivo != null
         ? (mesesAtivo >= 12 ? `${Math.floor(mesesAtivo / 12)} ano(s) e ${mesesAtivo % 12} meses` : `${mesesAtivo} mês(es)`)
         : 'desconhecido',
-      volume_estimado: totalAds > 0 ? `${totalAds} total (~${vpm}/mês)` : 'desconhecido',
-      total_ads: totalAds,
-      meses_ativo: mesesAtivo,
+      volume_estimado: totalAds != null
+        ? `${totalAds} total${vpm ? ` (~${vpm}/mês)` : ''}`
+        : 'desconhecido',
+      total_ads: totalAds ?? 0,
+      meses_ativo: mesesAtivo ?? 0,
+      confidence,
     };
-  }).sort((a: AdResult, b: AdResult) => b.total_ads - a.total_ads);
+  })
+  .filter((a: any) => a.confidence >= 0.2) // filter low-confidence noise
+  .sort((a: any, b: any) => b.total_ads - a.total_ads || b.confidence - a.confidence);
 }
 
 // ── Main ──
