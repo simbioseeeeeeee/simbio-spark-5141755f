@@ -37,10 +37,10 @@ async function searchAds(searchTerms: string[], locationPart: string): Promise<A
     terms.push(`"${kw}" "biblioteca de anúncios" construtora incorporadora lançamento ${locationPart}`.trim());
   }
 
-  // Run searches in parallel (max 4 to avoid rate limits)
+  // Run searches in parallel (max 6 for better coverage)
   console.log('Starting Firecrawl searches:', terms.length, 'terms');
   const searchResults = await Promise.all(
-    terms.slice(0, 4).map(async (term) => {
+    terms.slice(0, 6).map(async (term) => {
       try {
         const res = await fetch('https://api.firecrawl.dev/v1/search', {
           method: 'POST',
