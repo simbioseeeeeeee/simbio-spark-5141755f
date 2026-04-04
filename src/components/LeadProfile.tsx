@@ -161,6 +161,7 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
         pesquisa_realizada: true,
       };
       const updated = await updateLead(toSave);
+      setForm(updated);
       onSaved(updated);
       toast({ title: "Qualificação salva!", description: `Lead "${current.fantasia || current.razao_social}" atualizado com sucesso.` });
     } catch (err: any) {
