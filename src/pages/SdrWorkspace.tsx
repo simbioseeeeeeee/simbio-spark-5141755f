@@ -229,6 +229,11 @@ function SdrExplorerView({ territorio }: { territorio: string }) {
 
   const cidadeParam = territorio === "__all__" ? "" : territorio;
 
+  const handleLeadSaved = (updated: Lead) => {
+    setSelectedLead(updated);
+    setRefreshKey((k) => k + 1);
+  };
+
   return (
     <>
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -238,7 +243,7 @@ function SdrExplorerView({ territorio }: { territorio: string }) {
         <NewLeadModal onCreated={() => setRefreshKey((k) => k + 1)} />
       </div>
       <LeadExplorer key={refreshKey} territorio={cidadeParam} onSelectLead={setSelectedLead} />
-      <LeadProfile lead={selectedLead} open={!!selectedLead} onClose={() => setSelectedLead(null)} onSaved={(u) => setSelectedLead(u)} />
+      <LeadProfile lead={selectedLead} open={!!selectedLead} onClose={() => setSelectedLead(null)} onSaved={handleLeadSaved} />
     </>
   );
 }
