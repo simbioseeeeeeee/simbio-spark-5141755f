@@ -118,7 +118,10 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
       updated.lead_score = calculateScore(updated);
       updated.pesquisa_realizada = true;
 
-      setForm(updated);
+      // Auto-save research results to database
+      const saved = await updateLead(updated);
+      setForm(saved);
+      onSaved(saved);
 
       // Log pesquisa activity for every AI research execution
       await supabase.from("atividades").insert({
@@ -128,7 +131,7 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
         nota: `Pesquisa IA individual — Score: ${updated.lead_score}`,
       });
 
-      toast({ title: "✅ Pesquisa concluída!", description: `Score: ${updated.lead_score} pts. Revise e salve.` });
+      toast({ title: "✅ Pesquisa concluída e salva!", description: `Score: ${updated.lead_score} pts.` });
     } catch (err: any) {
       toast({ title: "Erro na pesquisa automática", description: err.message, variant: "destructive" });
     } finally {
