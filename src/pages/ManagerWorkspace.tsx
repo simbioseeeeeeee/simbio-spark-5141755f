@@ -184,6 +184,7 @@ const TARGET_LABELS: { key: keyof DailyTargets; label: string; prefix?: string }
   { key: "reunioes", label: "Reuniões/dia" },
   { key: "fechamentos", label: "Fechamentos/dia" },
   { key: "pipeline", label: "Pipeline (R$)/dia", prefix: "R$ " },
+  { key: "desq_limite", label: "Limite de Desqualificações (total)" },
 ];
 
 function TargetsEditor({ targets, onSave }: { targets: DailyTargets; onSave: (t: DailyTargets) => void }) {
