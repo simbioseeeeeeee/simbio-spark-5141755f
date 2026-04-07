@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Lead, STATUS_OPTIONS, LeadStatus, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, calculateScore } from "@/types/lead";
-import { updateLead, registrarReuniaoAgendada } from "@/store/leads-store";
+import { updateLead, registrarReuniaoAgendada, leadHasReuniaoActivity } from "@/store/leads-store";
 import { useAuth } from "@/contexts/AuthContext";
 import { CopyButton } from "./CopyButton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -16,7 +16,7 @@ import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles } from "lucide-react";
+import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles, CheckCircle2, XCircle } from "lucide-react";
 
 // calculateScore is now imported from types/lead
 
@@ -81,6 +81,16 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
   const current = form?.id === lead?.id ? form : lead;
 
   const score = useMemo(() => current ? calculateScore(current) : 0, [current]);
+
+  // Check if meeting activity is logged for this lead
+  const [meetingLogged, setMeetingLogged] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!lead?.id || lead.status_sdr !== "Reunião Agendada") {
+      setMeetingLogged(null);
+      return;
+    }
+    leadHasReuniaoActivity(lead.id).then(setMeetingLogged).catch(() => setMeetingLogged(null));
+  }, [lead?.id, lead?.status_sdr]);
 
   const setField = <K extends keyof Lead>(key: K, val: Lead[K]) => {
     if (!current) return;
@@ -217,6 +227,15 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
             </div>
             <StatusBadge status={current.status_sdr} />
           </div>
+          {/* Meeting activity indicator */}
+          {current.status_sdr === "Reunião Agendada" && meetingLogged !== null && (
+            <div className={`mt-2 flex items-center gap-1.5 text-xs font-medium ${meetingLogged ? "text-success" : "text-destructive"}`}>
+              {meetingLogged
+                ? <><CheckCircle2 className="h-3.5 w-3.5" /> Reunião contabilizada nas métricas</>
+                : <><XCircle className="h-3.5 w-3.5" /> Reunião NÃO contabilizada nas métricas</>
+              }
+            </div>
+          )}
           {/* Score Display */}
           <div className="mt-3">
             <div className="flex items-center gap-2 mb-1">

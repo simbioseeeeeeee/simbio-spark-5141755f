@@ -570,3 +570,28 @@ export async function getSdrPerformance(cidade: string | null, days: number): Pr
     reunioes: Number(r.reunioes) || 0,
   }));
 }
+
+// ─── Audit: Reunião Inconsistencies ─────────────────────────
+export interface ReuniaoInconsistency {
+  id: string;
+  fantasia: string | null;
+  razao_social: string | null;
+  cidade: string | null;
+  created_at: string;
+}
+
+export async function getReuniaoInconsistencies(cidade: string | null): Promise<ReuniaoInconsistency[]> {
+  const { data, error } = await supabase.rpc("get_reuniao_inconsistencies" as any, {
+    p_cidade: cidade || undefined,
+  });
+  if (error) throw error;
+  return (data || []) as ReuniaoInconsistency[];
+}
+
+export async function leadHasReuniaoActivity(leadId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("lead_has_reuniao_activity" as any, {
+    p_lead_id: leadId,
+  });
+  if (error) throw error;
+  return !!data;
+}
