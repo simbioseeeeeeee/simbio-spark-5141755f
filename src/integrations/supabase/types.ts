@@ -526,6 +526,10 @@ export type Database = {
       get_manager_analytics: {
         Args: { p_cidade?: string; p_days?: number }
         Returns: {
+          desq_geral: number
+          desq_sem_budget: number
+          desq_sem_interesse: number
+          desq_sem_perfil: number
           total_atividades: number
           total_desqualificados: number
           total_fechamentos: number
