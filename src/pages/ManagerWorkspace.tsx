@@ -46,9 +46,10 @@ interface DailyTargets {
   reunioes: number;
   fechamentos: number;
   pipeline: number;
+  desq_limite: number;
 }
 
-const DEFAULT_TARGETS: DailyTargets = { leads: 5, atividades: 30, reunioes: 3, fechamentos: 1, pipeline: 10000 };
+const DEFAULT_TARGETS: DailyTargets = { leads: 5, atividades: 30, reunioes: 3, fechamentos: 1, pipeline: 10000, desq_limite: 10 };
 
 async function loadTargetsFromDB(userId: string): Promise<DailyTargets> {
   const { data, error } = await supabase
