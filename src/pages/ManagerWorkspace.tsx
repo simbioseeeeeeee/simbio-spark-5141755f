@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Lead } from "@/types/lead";
 import {
   getManagerAnalytics, getLeaderboard, getActivityTrend, getConversionFunnel,
-  getPipelineByStage, getActivityBreakdown, getSdrPerformance,
+  getPipelineByStage, getActivityBreakdown, getSdrPerformance, getDisqualificationTrend,
   ManagerAnalytics, LeaderboardEntry, ActivityTrendEntry, FunnelEntry,
   PipelineStageEntry, ActivityBreakdownEntry, SdrPerformanceEntry,
+  DisqualificationTrendEntry,
   getCadenciaHoje, getDailyMetrics, DailyMetrics,
 } from "@/store/leads-store";
 import { useAuth } from "@/contexts/AuthContext";
