@@ -527,6 +527,7 @@ export type Database = {
         Args: { p_cidade?: string; p_days?: number }
         Returns: {
           total_atividades: number
+          total_desqualificados: number
           total_fechamentos: number
           total_leads_qualificados: number
           total_reunioes: number
