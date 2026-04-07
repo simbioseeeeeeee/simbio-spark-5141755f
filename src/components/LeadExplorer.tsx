@@ -21,7 +21,7 @@ function ScoreCell({ score }: { score: number | null }) {
   return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold border ${color}`}>{score}</span>;
 }
 
-type QuickFilter = "todos" | "pesquisados" | "nao_pesquisados" | "qualificados";
+type QuickFilter = "todos" | "pesquisados" | "nao_pesquisados" | "qualificados" | "desqualificados";
 
 interface Props {
   territorio: string;
