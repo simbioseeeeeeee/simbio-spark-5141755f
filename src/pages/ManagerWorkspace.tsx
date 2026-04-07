@@ -251,6 +251,8 @@ function AnalyticsView({ territorio }: { territorio: string }) {
   const [dailyTargets, setDailyTargets] = useState<DailyTargets>(DEFAULT_TARGETS);
   const [kpiAlerts, setKpiAlerts] = useState<KpiAlert[]>([]);
   const [alertsDismissed, setAlertsDismissed] = useState(false);
+  const [desqTrend, setDesqTrend] = useState<DisqualificationTrendEntry[]>([]);
+  const [drillDownFilter, setDrillDownFilter] = useState<string | null>(null);
 
   // Load targets from DB on mount
   useEffect(() => {
