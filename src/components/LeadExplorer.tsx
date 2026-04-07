@@ -61,6 +61,7 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
         page, cidade: territorio, search: debouncedSearch, statusFilter,
         pesquisaFilter: pesquisaFilter === "pesquisados" ? "pesquisados" : pesquisaFilter === "nao_pesquisados" ? "nao_pesquisados" : undefined,
         scoreFilter: pesquisaFilter === "qualificados" ? "qualificados" : undefined,
+        desqualificadosFilter: pesquisaFilter === "desqualificados",
         sortByScore,
         dateFrom: dateFrom?.toISOString(),
         dateTo: dateTo ? new Date(dateTo.getTime() + 86400000 - 1).toISOString() : undefined,

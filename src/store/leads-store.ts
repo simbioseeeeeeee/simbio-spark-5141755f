@@ -197,6 +197,7 @@ export interface LeadsQuery {
   statusFilter?: string;
   pesquisaFilter?: string;
   scoreFilter?: string;
+  desqualificadosFilter?: boolean;
   sortByScore?: boolean;
   dateFrom?: string;
   dateTo?: string;
