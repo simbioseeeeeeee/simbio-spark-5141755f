@@ -364,6 +364,7 @@ export interface ManagerAnalytics {
   total_reunioes: number;
   total_fechamentos: number;
   valor_pipeline: number;
+  total_desqualificados: number;
 }
 
 export async function getManagerAnalytics(cidade: string | null, days: number): Promise<ManagerAnalytics> {
@@ -379,6 +380,7 @@ export async function getManagerAnalytics(cidade: string | null, days: number): 
     total_reunioes: Number(row.total_reunioes) || 0,
     total_fechamentos: Number(row.total_fechamentos) || 0,
     valor_pipeline: Number(row.valor_pipeline) || 0,
+    total_desqualificados: Number(row.total_desqualificados) || 0,
   };
 }
 

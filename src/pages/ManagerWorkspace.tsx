@@ -376,11 +376,12 @@ function AnalyticsView({ territorio }: { territorio: string }) {
             <div className="flex items-center justify-end">
               <TargetsEditor targets={dailyTargets} onSave={async (newT) => { setDailyTargets(newT); if (user?.id) await saveTargetsToDB(user.id, newT); }} />
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
               <KpiCard label="Leads Qualificados" value={Number(analytics.total_leads_qualificados)} icon={Users} color="bg-primary/10 text-primary" target={t.leads} />
               <KpiCard label="Atividades" value={Number(analytics.total_atividades)} icon={Activity} color="bg-warning/10 text-warning" target={t.atividades} />
               <KpiCard label="Reuniões" value={Number(analytics.total_reunioes)} icon={CalendarCheck} color="bg-success/10 text-success" target={t.reunioes} />
               <KpiCard label="Fechamentos" value={Number(analytics.total_fechamentos)} icon={Target} color="bg-success/10 text-success" target={t.fechamentos} />
+              <KpiCard label="Desqualificados" value={Number(analytics.total_desqualificados)} icon={AlertTriangle} color="bg-destructive/10 text-destructive" />
               <KpiCard label="Pipeline (R$)" value={formatCurrency(Number(analytics.valor_pipeline))} icon={DollarSign} color="bg-primary/10 text-primary" prefix="" target={t.pipeline} />
             </div>
           </div>
