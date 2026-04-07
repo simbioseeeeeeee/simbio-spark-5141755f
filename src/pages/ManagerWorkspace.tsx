@@ -256,6 +256,40 @@ function AnalyticsView({ territorio }: { territorio: string }) {
     }
   }, [user?.id]);
 
+  // Realtime: listen for leads being disqualified by SDR
+  useEffect(() => {
+    const channel = supabase
+      .channel('manager-desqualificados-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'leads' },
+        (payload) => {
+          const newLead = payload.new as any;
+          const oldLead = payload.old as any;
+          const wasNotDisqualified = !oldLead?.status_sdr?.startsWith('Desqualificado');
+          const isNowDisqualified = newLead?.status_sdr?.startsWith('Desqualificado');
+          if (wasNotDisqualified && isNowDisqualified) {
+            const nome = newLead.fantasia || newLead.razao_social || 'Lead';
+            const motivo = newLead.status_sdr.replace('Desqualificado - ', '').replace('Desqualificado', 'Geral');
+            toast({
+              title: "⚠️ Lead Desqualificado",
+              description: `${nome} (${newLead.cidade || '—'}) — Motivo: ${motivo}`,
+              variant: "destructive",
+            });
+            try {
+              const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbsGczJjmEw9jUhkMtPXmv0NmcUjhHcKXM2qpfO0pvn8XYsmY+TGueyNS1d0NMdJ7B0bVxREhribrSuXlJUHWXvM+5eElQdJa7z7lwSlF2mL3PuXNLUnabvs+5c0pQdJe80LpyS1J2mLzPuXBKUHSXvM+5');
+              audio.volume = 0.2;
+              audio.play().catch(() => {});
+            } catch {}
+            // Refresh data to update KPI counts
+            loadData();
+          }
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [loadData]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
