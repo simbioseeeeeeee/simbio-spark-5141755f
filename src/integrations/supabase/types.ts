@@ -560,6 +560,16 @@ export type Database = {
           valor_total: number
         }[]
       }
+      get_reuniao_inconsistencies: {
+        Args: { p_cidade?: string }
+        Returns: {
+          cidade: string
+          created_at: string
+          fantasia: string
+          id: string
+          razao_social: string
+        }[]
+      }
       get_sdr_performance: {
         Args: { p_cidade?: string; p_days?: number }
         Returns: {
@@ -578,6 +588,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      lead_has_reuniao_activity: {
+        Args: { p_lead_id: string }
         Returns: boolean
       }
       snapshot_daily_kpis: { Args: { p_cidade?: string }; Returns: undefined }
