@@ -197,6 +197,7 @@ export interface LeadsQuery {
   statusFilter?: string;
   pesquisaFilter?: string;
   scoreFilter?: string;
+  desqualificadosFilter?: boolean;
   sortByScore?: boolean;
   dateFrom?: string;
   dateTo?: string;
@@ -231,6 +232,10 @@ export async function getLeadsPaginated(q: LeadsQuery): Promise<LeadsResult> {
 
   if (q.scoreFilter === "qualificados") {
     query = query.gte("lead_score", 60);
+  }
+
+  if (q.desqualificadosFilter) {
+    query = query.like("status_sdr", "Desqualificado%");
   }
 
   if (q.dateFrom) {

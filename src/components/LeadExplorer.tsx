@@ -21,7 +21,7 @@ function ScoreCell({ score }: { score: number | null }) {
   return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold border ${color}`}>{score}</span>;
 }
 
-type QuickFilter = "todos" | "pesquisados" | "nao_pesquisados" | "qualificados";
+type QuickFilter = "todos" | "pesquisados" | "nao_pesquisados" | "qualificados" | "desqualificados";
 
 interface Props {
   territorio: string;
@@ -61,6 +61,7 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
         page, cidade: territorio, search: debouncedSearch, statusFilter,
         pesquisaFilter: pesquisaFilter === "pesquisados" ? "pesquisados" : pesquisaFilter === "nao_pesquisados" ? "nao_pesquisados" : undefined,
         scoreFilter: pesquisaFilter === "qualificados" ? "qualificados" : undefined,
+        desqualificadosFilter: pesquisaFilter === "desqualificados",
         sortByScore,
         dateFrom: dateFrom?.toISOString(),
         dateTo: dateTo ? new Date(dateTo.getTime() + 86400000 - 1).toISOString() : undefined,
@@ -92,6 +93,7 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
     { key: "nao_pesquisados", label: "Não Pesquisados" },
     { key: "pesquisados", label: "Já Pesquisados" },
     { key: "qualificados", label: "Score ≥ 60" },
+    { key: "desqualificados", label: "Desqualificados" },
   ];
 
   return (
