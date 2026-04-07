@@ -36,7 +36,8 @@ import {
 } from "recharts";
 
 import { supabase } from "@/integrations/supabase/client";
-import { Bell } from "lucide-react";
+import { Bell, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // ─── Editable daily targets (persisted in database) ─────────
 interface DailyTargets {
