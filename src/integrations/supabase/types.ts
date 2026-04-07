@@ -487,6 +487,17 @@ export type Database = {
           tentativas_hoje: number
         }[]
       }
+      get_disqualification_trend: {
+        Args: { p_cidade?: string; p_days?: number }
+        Returns: {
+          desq_geral: number
+          desq_sem_budget: number
+          desq_sem_interesse: number
+          desq_sem_perfil: number
+          dia: string
+          total_desq: number
+        }[]
+      }
       get_kpi_alerts: {
         Args: {
           p_cidade?: string
