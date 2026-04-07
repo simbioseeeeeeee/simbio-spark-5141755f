@@ -481,7 +481,18 @@ function AnalyticsView({ territorio }: { territorio: string }) {
         </div>
       )}
 
-      {/* KPI Row */}
+      {/* Disqualification Volume Alert */}
+      {analytics && Number(analytics.total_desqualificados) >= dailyTargets.desq_limite && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+          <div className="flex items-center gap-2 text-sm">
+            <AlertTriangle className="h-4 w-4 text-destructive animate-pulse shrink-0" />
+            <span>
+              <strong>Alerta de Desqualificações:</strong> O volume atual (<strong>{analytics.total_desqualificados}</strong>) atingiu ou ultrapassou o limite configurado de <strong>{dailyTargets.desq_limite}</strong> leads desqualificados.
+            </span>
+          </div>
+        </div>
+      )}
+
       {(() => {
         const mult = period === 1 ? 1 : period;
         const t = {
