@@ -332,7 +332,7 @@ export async function getStatusCounts(cidade: string): Promise<Record<string, nu
     .eq("cidade", cidade);
   if (totalErr) throw totalErr;
 
-  const statuses = ["A Contatar", "Em Qualificação", "Reunião Agendada", "Desqualificado"];
+  const statuses = ["A Contatar", "Em Qualificação", "Reunião Agendada"];
   const counts: Record<string, number> = { all: total ?? 0 };
 
   await Promise.all(
