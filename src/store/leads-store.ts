@@ -370,6 +370,10 @@ export interface ManagerAnalytics {
   total_fechamentos: number;
   valor_pipeline: number;
   total_desqualificados: number;
+  desq_sem_perfil: number;
+  desq_sem_budget: number;
+  desq_sem_interesse: number;
+  desq_geral: number;
 }
 
 export async function getManagerAnalytics(cidade: string | null, days: number): Promise<ManagerAnalytics> {
@@ -386,6 +390,10 @@ export async function getManagerAnalytics(cidade: string | null, days: number): 
     total_fechamentos: Number(row.total_fechamentos) || 0,
     valor_pipeline: Number(row.valor_pipeline) || 0,
     total_desqualificados: Number(row.total_desqualificados) || 0,
+    desq_sem_perfil: Number(row.desq_sem_perfil) || 0,
+    desq_sem_budget: Number(row.desq_sem_budget) || 0,
+    desq_sem_interesse: Number(row.desq_sem_interesse) || 0,
+    desq_geral: Number(row.desq_geral) || 0,
   };
 }
 
