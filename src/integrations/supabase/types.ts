@@ -227,6 +227,7 @@ export type Database = {
         Row: {
           atividades: number
           created_at: string
+          desq_limite: number
           fechamentos: number
           id: string
           leads: number
@@ -238,6 +239,7 @@ export type Database = {
         Insert: {
           atividades?: number
           created_at?: string
+          desq_limite?: number
           fechamentos?: number
           id?: string
           leads?: number
@@ -249,6 +251,7 @@ export type Database = {
         Update: {
           atividades?: number
           created_at?: string
+          desq_limite?: number
           fechamentos?: number
           id?: string
           leads?: number
