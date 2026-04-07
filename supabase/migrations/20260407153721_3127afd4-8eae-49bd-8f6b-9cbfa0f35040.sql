@@ -1,0 +1,1 @@
+ALTER TABLE public.manager_targets ADD COLUMN IF NOT EXISTS desq_limite integer NOT NULL DEFAULT 10;

@@ -46,9 +46,10 @@ interface DailyTargets {
   reunioes: number;
   fechamentos: number;
   pipeline: number;
+  desq_limite: number;
 }
 
-const DEFAULT_TARGETS: DailyTargets = { leads: 5, atividades: 30, reunioes: 3, fechamentos: 1, pipeline: 10000 };
+const DEFAULT_TARGETS: DailyTargets = { leads: 5, atividades: 30, reunioes: 3, fechamentos: 1, pipeline: 10000, desq_limite: 10 };
 
 async function loadTargetsFromDB(userId: string): Promise<DailyTargets> {
   const { data, error } = await supabase
@@ -64,6 +65,7 @@ async function loadTargetsFromDB(userId: string): Promise<DailyTargets> {
     reunioes: Number(row.reunioes) || DEFAULT_TARGETS.reunioes,
     fechamentos: Number(row.fechamentos) || DEFAULT_TARGETS.fechamentos,
     pipeline: Number(row.pipeline) || DEFAULT_TARGETS.pipeline,
+    desq_limite: Number(row.desq_limite) || DEFAULT_TARGETS.desq_limite,
   };
 }
 
@@ -77,6 +79,7 @@ async function saveTargetsToDB(userId: string, t: DailyTargets): Promise<void> {
       reunioes: t.reunioes,
       fechamentos: t.fechamentos,
       pipeline: t.pipeline,
+      desq_limite: t.desq_limite,
       updated_at: new Date().toISOString(),
     } as any, { onConflict: "user_id" });
   if (error) throw error;
@@ -181,6 +184,7 @@ const TARGET_LABELS: { key: keyof DailyTargets; label: string; prefix?: string }
   { key: "reunioes", label: "Reuniões/dia" },
   { key: "fechamentos", label: "Fechamentos/dia" },
   { key: "pipeline", label: "Pipeline (R$)/dia", prefix: "R$ " },
+  { key: "desq_limite", label: "Limite de Desqualificações (total)" },
 ];
 
 function TargetsEditor({ targets, onSave }: { targets: DailyTargets; onSave: (t: DailyTargets) => void }) {
@@ -477,7 +481,18 @@ function AnalyticsView({ territorio }: { territorio: string }) {
         </div>
       )}
 
-      {/* KPI Row */}
+      {/* Disqualification Volume Alert */}
+      {analytics && Number(analytics.total_desqualificados) >= dailyTargets.desq_limite && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
+          <div className="flex items-center gap-2 text-sm">
+            <AlertTriangle className="h-4 w-4 text-destructive animate-pulse shrink-0" />
+            <span>
+              <strong>Alerta de Desqualificações:</strong> O volume atual (<strong>{analytics.total_desqualificados}</strong>) atingiu ou ultrapassou o limite configurado de <strong>{dailyTargets.desq_limite}</strong> leads desqualificados.
+            </span>
+          </div>
+        </div>
+      )}
+
       {(() => {
         const mult = period === 1 ? 1 : period;
         const t = {
