@@ -16,7 +16,7 @@ import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles } from "lucide-react";
+import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles, CheckCircle2, XCircle } from "lucide-react";
 
 // calculateScore is now imported from types/lead
 
