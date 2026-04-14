@@ -94,6 +94,7 @@ export type Database = {
       leads: {
         Row: {
           bairro: string | null
+          canal_preferido: string
           celular1: string | null
           celular2: string | null
           cep: string | null
@@ -137,6 +138,7 @@ export type Database = {
         }
         Insert: {
           bairro?: string | null
+          canal_preferido?: string
           celular1?: string | null
           celular2?: string | null
           cep?: string | null
@@ -180,6 +182,7 @@ export type Database = {
         }
         Update: {
           bairro?: string | null
+          canal_preferido?: string
           celular1?: string | null
           celular2?: string | null
           cep?: string | null
@@ -322,6 +325,7 @@ export type Database = {
         Args: { p_cidade?: string }
         Returns: {
           bairro: string | null
+          canal_preferido: string
           celular1: string | null
           celular2: string | null
           cep: string | null
@@ -374,6 +378,7 @@ export type Database = {
         Args: { p_cidade?: string }
         Returns: {
           bairro: string | null
+          canal_preferido: string
           celular1: string | null
           celular2: string | null
           cep: string | null
@@ -426,6 +431,7 @@ export type Database = {
         Args: { p_cidade?: string }
         Returns: {
           bairro: string | null
+          canal_preferido: string
           celular1: string | null
           celular2: string | null
           cep: string | null
@@ -572,6 +578,14 @@ export type Database = {
           total_atividades: number
           total_reunioes: number
           user_id: string
+        }[]
+      }
+      get_leads_last_contact: {
+        Args: { p_lead_ids: string[] }
+        Returns: {
+          lead_id: string
+          ultimo_contato_em: string
+          ultimo_contato_tipo: string
         }[]
       }
       get_manager_analytics: {
