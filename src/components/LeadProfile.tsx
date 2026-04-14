@@ -87,12 +87,22 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
 
   // Check if meeting activity is logged for this lead
   const [meetingLogged, setMeetingLogged] = useState<boolean | null>(null);
+  const [lastContact, setLastContact] = useState<{ em: string | null; tipo: string | null }>({ em: null, tipo: null });
   useEffect(() => {
-    if (!lead?.id || lead.status_sdr !== "Reunião Agendada") {
+    if (!lead?.id) {
       setMeetingLogged(null);
+      setLastContact({ em: null, tipo: null });
       return;
     }
-    leadHasReuniaoActivity(lead.id).then(setMeetingLogged).catch(() => setMeetingLogged(null));
+    if (lead.status_sdr === "Reunião Agendada") {
+      leadHasReuniaoActivity(lead.id).then(setMeetingLogged).catch(() => setMeetingLogged(null));
+    } else {
+      setMeetingLogged(null);
+    }
+    getLeadsLastContact([lead.id]).then((m) => {
+      const lc = m.get(lead.id);
+      setLastContact({ em: lc?.ultimo_contato_em || null, tipo: lc?.ultimo_contato_tipo || null });
+    }).catch(() => {});
   }, [lead?.id, lead?.status_sdr]);
 
   const setField = <K extends keyof Lead>(key: K, val: Lead[K]) => {
