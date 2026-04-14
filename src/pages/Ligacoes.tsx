@@ -173,6 +173,28 @@ export default function Ligacoes() {
           ))}
         </div>
 
+        {/* Trend Chart */}
+        {trend && trend.length > 1 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Ligações por dia</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={trend} barCategoryGap="20%">
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis dataKey="dia" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="atendidas" name="Atendidas" stackId="a" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="nao_atendidas" name="Não Atendidas" stackId="a" fill="hsl(var(--muted-foreground))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Filters */}
         <div className="flex items-center gap-3">
           <Select value={resultadoFilter} onValueChange={setResultadoFilter}>
