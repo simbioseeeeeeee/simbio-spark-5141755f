@@ -14,6 +14,8 @@ export interface Socio {
   email1?: string;
 }
 
+export type CanalPreferido = "whatsapp" | "telefone" | "email" | "linkedin" | "nao_definido";
+
 export interface Lead {
   id: string;
   cnpj: string;
@@ -56,6 +58,7 @@ export interface Lead {
   created_at: string;
   owner_id?: string | null;
   sdr_id?: string | null;
+  canal_preferido?: CanalPreferido;
 }
 
 export interface Atividade {
