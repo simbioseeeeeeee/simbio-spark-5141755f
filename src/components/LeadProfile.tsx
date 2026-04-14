@@ -240,6 +240,13 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
             </div>
             <StatusBadge status={current.status_sdr} />
           </div>
+          {/* Last contact badge */}
+          <div className="mt-2 flex items-center gap-3 flex-wrap">
+            <span className={cn("text-xs font-medium flex items-center gap-1", lastContactColor(lastContact.em))}>
+              {activityEmoji(lastContact.tipo)} Último contato: {lastContactLabel(lastContact.em)}
+              {lastContact.tipo && <span className="text-muted-foreground">· {lastContact.tipo}</span>}
+            </span>
+          </div>
           {/* Meeting activity indicator */}
           {current.status_sdr === "Reunião Agendada" && meetingLogged !== null && (
             <div className={`mt-2 flex items-center gap-1.5 text-xs font-medium ${meetingLogged ? "text-success" : "text-destructive"}`}>
