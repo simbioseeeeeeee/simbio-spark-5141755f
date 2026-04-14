@@ -17,33 +17,51 @@ export type Database = {
       atividades: {
         Row: {
           created_at: string
+          de_numero: string | null
+          duracao_segundos: number | null
           id: string
           lead_id: string
           nota: string | null
           owner_id: string | null
+          para_numero: string | null
           resultado: string
           sdr_id: string | null
+          sentimento: string | null
           tipo_atividade: string
+          transcricao: string | null
+          url_gravacao: string | null
         }
         Insert: {
           created_at?: string
+          de_numero?: string | null
+          duracao_segundos?: number | null
           id?: string
           lead_id: string
           nota?: string | null
           owner_id?: string | null
+          para_numero?: string | null
           resultado: string
           sdr_id?: string | null
+          sentimento?: string | null
           tipo_atividade: string
+          transcricao?: string | null
+          url_gravacao?: string | null
         }
         Update: {
           created_at?: string
+          de_numero?: string | null
+          duracao_segundos?: number | null
           id?: string
           lead_id?: string
           nota?: string | null
           owner_id?: string | null
+          para_numero?: string | null
           resultado?: string
           sdr_id?: string | null
+          sentimento?: string | null
           tipo_atividade?: string
+          transcricao?: string | null
+          url_gravacao?: string | null
         }
         Relationships: [
           {
@@ -479,6 +497,39 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      get_call_kpis: {
+        Args: { p_cidade?: string; p_days?: number }
+        Returns: {
+          duracao_media: number
+          reunioes_via_ligacao: number
+          taxa_atendimento: number
+          total_ligacoes: number
+        }[]
+      }
+      get_calls_list: {
+        Args: {
+          p_cidade?: string
+          p_days?: number
+          p_limit?: number
+          p_resultado?: string
+        }
+        Returns: {
+          atividade_id: string
+          cidade: string
+          created_at: string
+          de_numero: string
+          duracao_segundos: number
+          fantasia: string
+          lead_id: string
+          nota: string
+          para_numero: string
+          razao_social: string
+          resultado: string
+          sentimento: string
+          transcricao: string
+          url_gravacao: string
+        }[]
       }
       get_conversion_funnel: {
         Args: { p_cidade?: string }
