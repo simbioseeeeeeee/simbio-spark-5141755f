@@ -507,6 +507,15 @@ export type Database = {
           total_ligacoes: number
         }[]
       }
+      get_call_trend: {
+        Args: { p_cidade?: string; p_days?: number }
+        Returns: {
+          atendidas: number
+          dia: string
+          nao_atendidas: number
+          total: number
+        }[]
+      }
       get_calls_list: {
         Args: {
           p_cidade?: string
