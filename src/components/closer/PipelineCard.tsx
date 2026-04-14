@@ -4,11 +4,14 @@ import { GripVertical, Phone, MessageCircle, Calendar, Clock } from "lucide-reac
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { lastContactLabel, lastContactColor, activityEmoji } from "@/lib/contact-helpers";
 
 interface Props {
   lead: Lead;
   onClick: () => void;
   atividades: Atividade[];
+  ultimoContatoEm?: string | null;
+  ultimoContatoTipo?: string | null;
 }
 
 function daysInStage(lead: Lead): number | null {
