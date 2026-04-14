@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from "react";
-import { Lead, STATUS_OPTIONS, LeadStatus, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, calculateScore } from "@/types/lead";
+import { Lead, STATUS_OPTIONS, LeadStatus, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, calculateScore, CanalPreferido } from "@/types/lead";
 import { LeadTimeline } from "./LeadTimeline";
-import { updateLead, registrarReuniaoAgendada, leadHasReuniaoActivity } from "@/store/leads-store";
+import { updateLead, registrarReuniaoAgendada, leadHasReuniaoActivity, getLeadsLastContact } from "@/store/leads-store";
+import { lastContactLabel, lastContactColor, activityEmoji, CANAL_CONFIG } from "@/lib/contact-helpers";
 import { useAuth } from "@/contexts/AuthContext";
 import { CopyButton } from "./CopyButton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
