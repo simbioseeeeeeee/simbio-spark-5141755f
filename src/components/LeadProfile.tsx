@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { Lead, STATUS_OPTIONS, LeadStatus, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, calculateScore } from "@/types/lead";
+import { LeadTimeline } from "./LeadTimeline";
 import { updateLead, registrarReuniaoAgendada, leadHasReuniaoActivity } from "@/store/leads-store";
 import { useAuth } from "@/contexts/AuthContext";
 import { CopyButton } from "./CopyButton";
@@ -12,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/hooks/use-toast";
