@@ -501,6 +501,43 @@ export type Database = {
           total_desq: number
         }[]
       }
+      get_followups_kpis: {
+        Args: { p_cidade?: string }
+        Returns: {
+          atrasados: number
+          hoje: number
+          proximos_3_dias: number
+        }[]
+      }
+      get_followups_list: {
+        Args: {
+          p_cidade?: string
+          p_estagio_funil?: string
+          p_limit?: number
+          p_responsavel_id?: string
+          p_sort?: string
+          p_status_sdr?: string
+        }
+        Returns: {
+          celular1: string
+          cidade: string
+          data_proximo_passo: string
+          email1: string
+          estagio_funil: string
+          fantasia: string
+          id: string
+          observacoes_closer: string
+          observacoes_sdr: string
+          owner_id: string
+          razao_social: string
+          sdr_id: string
+          status_sdr: string
+          telefone1: string
+          uf: string
+          ultimo_contato_em: string
+          ultimo_contato_tipo: string
+        }[]
+      }
       get_kpi_alerts: {
         Args: {
           p_cidade?: string
