@@ -231,12 +231,19 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
                   <TableHead>Empresa</TableHead>
                   <TableHead className="w-[160px]">CNPJ</TableHead>
                   <TableHead className="w-[140px]">Celular</TableHead>
-                  <TableHead className="w-[100px]">Bairro</TableHead>
-                  <TableHead className="w-[70px] text-center">Score</TableHead>
+                   <TableHead className="w-[100px]">Bairro</TableHead>
+                   <TableHead className="w-[90px]">Último</TableHead>
+                   <TableHead className="w-[70px]">Canal</TableHead>
+                   <TableHead className="w-[70px] text-center">Score</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {result.leads.map((lead) => (
+                {result.leads.map((lead) => {
+                  const lc = lastContacts.get(lead.id);
+                  const canal = lead.canal_preferido || "nao_definido";
+                  const canalCfg = CANAL_CONFIG[canal as CanalPreferido] || CANAL_CONFIG.nao_definido;
+                  const CanalIcon = canalCfg.icon;
+                  return (
                   <TableRow key={lead.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => onSelectLead(lead)}>
                     <TableCell className="px-2">
                       {lead.pesquisa_realizada && <span title="Pesquisa realizada"><CheckCircle2 className="h-4 w-4 text-success" /></span>}
@@ -251,9 +258,22 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
                       </span>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">{lead.bairro}</TableCell>
+                    <TableCell>
+                      <span className={cn("text-xs font-medium", lastContactColor(lc?.ultimo_contato_em || null))}>
+                        {activityEmoji(lc?.ultimo_contato_tipo || null)} {lastContactLabel(lc?.ultimo_contato_em || null)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {canal !== "nao_definido" && (
+                        <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border", canalCfg.color)}>
+                          <CanalIcon className="h-3 w-3" />
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-center"><ScoreCell score={lead.lead_score} /></TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
