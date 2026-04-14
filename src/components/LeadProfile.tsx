@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { Lead, STATUS_OPTIONS, LeadStatus, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, calculateScore } from "@/types/lead";
+import { LeadTimeline } from "./LeadTimeline";
 import { updateLead, registrarReuniaoAgendada, leadHasReuniaoActivity } from "@/store/leads-store";
 import { useAuth } from "@/contexts/AuthContext";
 import { CopyButton } from "./CopyButton";
@@ -12,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/hooks/use-toast";
@@ -246,6 +248,14 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
           </div>
         </SheetHeader>
 
+        <Tabs defaultValue="ficha" className="flex-1">
+          <div className="px-6 pt-2 border-b border-border">
+            <TabsList className="h-8">
+              <TabsTrigger value="ficha" className="text-xs">Ficha</TabsTrigger>
+              <TabsTrigger value="timeline" className="text-xs">Timeline</TabsTrigger>
+            </TabsList>
+          </div>
+          <TabsContent value="ficha" className="mt-0">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-border min-h-0">
           {/* Left Column - Read Only */}
           <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(100vh-180px)]">
@@ -454,6 +464,11 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
             </div>
           </div>
         </div>
+          </TabsContent>
+          <TabsContent value="timeline" className="mt-0 p-6 overflow-y-auto max-h-[calc(100vh-220px)]">
+            <LeadTimeline leadId={current.id} />
+          </TabsContent>
+        </Tabs>
       </SheetContent>
     </Sheet>
   );
