@@ -667,9 +667,3 @@ export async function getUserRolesList(): Promise<{ user_id: string; nome: strin
   if (error) throw error;
   return (data || []) as any[];
 }
-  const { data, error } = await supabase.rpc("lead_has_reuniao_activity" as any, {
-    p_lead_id: leadId,
-  });
-  if (error) throw error;
-  return !!data;
-}
