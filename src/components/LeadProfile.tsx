@@ -248,6 +248,14 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
           </div>
         </SheetHeader>
 
+        <Tabs defaultValue="ficha" className="flex-1">
+          <div className="px-6 pt-2 border-b border-border">
+            <TabsList className="h-8">
+              <TabsTrigger value="ficha" className="text-xs">Ficha</TabsTrigger>
+              <TabsTrigger value="timeline" className="text-xs">Timeline</TabsTrigger>
+            </TabsList>
+          </div>
+          <TabsContent value="ficha" className="mt-0">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-border min-h-0">
           {/* Left Column - Read Only */}
           <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(100vh-180px)]">
