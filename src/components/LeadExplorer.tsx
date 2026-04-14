@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Lead, STATUS_OPTIONS } from "@/types/lead";
-import { getLeadsPaginated, LeadsResult } from "@/store/leads-store";
+import { Lead, STATUS_OPTIONS, CanalPreferido } from "@/types/lead";
+import { getLeadsPaginated, LeadsResult, getLeadsLastContact, LastContactInfo } from "@/store/leads-store";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,9 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Slider } from "@/components/ui/slider";
-import { Search, Loader2, ChevronLeft, ChevronRight, CheckCircle2, Bot, ArrowUpDown, Users, SlidersHorizontal, CalendarIcon, X } from "lucide-react";
+import { Search, Loader2, ChevronLeft, ChevronRight, CheckCircle2, Bot, ArrowUpDown, Users, SlidersHorizontal, CalendarIcon, X, Phone, Mail, MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { lastContactColor, lastContactLabel, activityEmoji, CANAL_CONFIG } from "@/lib/contact-helpers";
 
 function ScoreCell({ score }: { score: number | null }) {
   if (score === null) return <span className="text-muted-foreground text-xs">—</span>;
@@ -30,6 +31,7 @@ interface Props {
 
 export function LeadExplorer({ territorio, onSelectLead }: Props) {
   const [result, setResult] = useState<LeadsResult>({ leads: [], total: 0, page: 0, pageSize: 50 });
+  const [lastContacts, setLastContacts] = useState<Map<string, LastContactInfo>>(new Map());
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
