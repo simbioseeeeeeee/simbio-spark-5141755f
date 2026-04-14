@@ -162,7 +162,7 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
                     />
                     );
                   })}
-                  ))}
+                  
                   {colLeads.length === 0 && (
                     <p className="text-xs text-muted-foreground text-center py-8">Vazio</p>
                   )}
