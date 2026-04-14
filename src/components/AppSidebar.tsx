@@ -16,7 +16,7 @@ import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import {
-  Crosshair, List, Columns3, BarChart3, LogOut, Building2, Megaphone,
+  Crosshair, List, Columns3, BarChart3, LogOut, Building2, Megaphone, CalendarClock,
 } from "lucide-react";
 
 interface NavItem {

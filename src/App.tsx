@@ -10,6 +10,7 @@ import Login from "./pages/Login";
 import SdrWorkspace from "./pages/SdrWorkspace";
 import CloserWorkspace from "./pages/CloserWorkspace";
 import ManagerWorkspace from "./pages/ManagerWorkspace";
+import FollowUps from "./pages/FollowUps";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/manager/cadencia" element={<ProtectedRoute allowedRoles={["manager"]}><ManagerWorkspace /></ProtectedRoute>} />
             <Route path="/manager/pipeline" element={<ProtectedRoute allowedRoles={["manager"]}><ManagerWorkspace /></ProtectedRoute>} />
             <Route path="/manager/explorador" element={<ProtectedRoute allowedRoles={["manager"]}><ManagerWorkspace /></ProtectedRoute>} />
+            <Route path="/follow-ups" element={<ProtectedRoute allowedRoles={["sdr", "closer", "manager"]}><FollowUps /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
