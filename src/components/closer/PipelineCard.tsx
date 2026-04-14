@@ -129,6 +129,11 @@ export function PipelineCard({ lead, onClick, atividades, ultimoContatoEm, ultim
           ))}
         </div>
       )}
+
+      {/* Last contact footer */}
+      <div className={`text-[11px] font-medium ${lastContactColor(ultimoContatoEm || null)}`}>
+        {activityEmoji(ultimoContatoTipo || null)} {lastContactLabel(ultimoContatoEm || null)}
+      </div>
     </div>
   );
 }
