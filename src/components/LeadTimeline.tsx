@@ -59,14 +59,18 @@ export function LeadTimeline({ leadId }: Props) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
-    supabase
-      .rpc("get_lead_atividades" as any, { p_lead_id: leadId, p_limit: 100 })
-      .then(({ data, error }) => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .rpc("get_lead_atividades" as any, { p_lead_id: leadId, p_limit: 100 });
         if (error) console.error(error);
         setEntries((data || []) as TimelineEntry[]);
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, [leadId]);
 
   if (loading) {
