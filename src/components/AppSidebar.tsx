@@ -29,11 +29,13 @@ const SDR_ITEMS: NavItem[] = [
   { title: "Foco de Hoje", url: "/sdr", icon: Crosshair },
   { title: "Explorador", url: "/sdr/explorador", icon: List },
   { title: "Anúncios", url: "/sdr/anuncios", icon: Megaphone },
+  { title: "Follow-ups", url: "/follow-ups", icon: CalendarClock },
 ];
 
 const CLOSER_ITEMS: NavItem[] = [
   { title: "Pipeline", url: "/closer", icon: Columns3 },
   { title: "Explorador", url: "/closer/explorador", icon: List },
+  { title: "Follow-ups", url: "/follow-ups", icon: CalendarClock },
 ];
 
 const MANAGER_ITEMS: NavItem[] = [
@@ -41,6 +43,7 @@ const MANAGER_ITEMS: NavItem[] = [
   { title: "Cadência SDR", url: "/manager/cadencia", icon: Crosshair },
   { title: "Pipeline Closer", url: "/manager/pipeline", icon: Columns3 },
   { title: "Explorador", url: "/manager/explorador", icon: List },
+  { title: "Follow-ups", url: "/follow-ups", icon: CalendarClock },
 ];
 
 const ROLE_LABELS: Record<AppRole, string> = {
