@@ -207,7 +207,7 @@ export default function Ligacoes() {
         )}
 
         {/* Filters */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Select value={resultadoFilter} onValueChange={setResultadoFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Resultado" />
@@ -221,6 +221,21 @@ export default function Ligacoes() {
               <SelectItem value="Recusou">Recusou</SelectItem>
             </SelectContent>
           </Select>
+          {role === "manager" && teamMembers && teamMembers.length > 0 && (
+            <Select value={sdrFilter} onValueChange={setSdrFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos responsáveis</SelectItem>
+                {teamMembers.map((m) => (
+                  <SelectItem key={m.user_id} value={m.user_id}>
+                    {m.nome || m.user_id.slice(0, 8)} ({m.role})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <span className="text-sm text-muted-foreground">
             {calls?.length ?? 0} ligações
           </span>
