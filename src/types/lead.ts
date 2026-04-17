@@ -113,6 +113,17 @@ export interface Lead {
   owner_id?: string | null;
   sdr_id?: string | null;
   canal_preferido?: CanalPreferido;
+  // Campos reais do Supabase mdewbruvzrrxezsbyzmq (snake_case)
+  responsavel_sdr?: string | null;
+  responsavel_closer?: string | null;
+  motivo_perda?: string | null;
+  tentativas_followup?: number | null;
+  data_ultimo_contato?: string | null;
+  qtde_funcionarios?: number | null;
+  cnae?: string | null;
+  cnae_grupo?: string | null;
+  cnae_setor?: string | null;
+  tipo_empresa?: string | null;
 }
 
 export interface Atividade {

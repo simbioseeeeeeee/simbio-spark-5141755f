@@ -244,10 +244,21 @@ export function LeadDetailSheet({ leadId, cnpj, open, onOpenChange }: Props) {
                   <div className="font-medium">{lead.estagio_funil || "—"}</div>
                 </div>
                 <div>
+                  <div className="text-xs text-muted-foreground">Responsável SDR</div>
+                  <div className="text-sm">{lead.responsavel_sdr || "—"}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Responsável Closer</div>
+                  <div className="text-sm">{lead.responsavel_closer || "—"}</div>
+                </div>
+                <div>
                   <div className="text-xs text-muted-foreground">Último contato</div>
                   <div className="text-xs">
-                    {lead.updated_at
-                      ? formatDistanceToNow(new Date(lead.updated_at), { addSuffix: true, locale: ptBR })
+                    {lead.data_ultimo_contato || lead.updated_at
+                      ? formatDistanceToNow(new Date(lead.data_ultimo_contato || lead.updated_at!), {
+                          addSuffix: true,
+                          locale: ptBR,
+                        })
                       : "nunca"}
                   </div>
                 </div>
@@ -259,6 +270,18 @@ export function LeadDetailSheet({ leadId, cnpj, open, onOpenChange }: Props) {
                       : "—"}
                   </div>
                 </div>
+                {lead.tentativas_followup != null && (
+                  <div>
+                    <div className="text-xs text-muted-foreground">Tentativas follow-up</div>
+                    <div className="text-sm">{lead.tentativas_followup}</div>
+                  </div>
+                )}
+                {lead.motivo_perda && (
+                  <div className="col-span-2">
+                    <div className="text-xs text-muted-foreground">Motivo perda</div>
+                    <div className="text-sm text-destructive">{lead.motivo_perda}</div>
+                  </div>
+                )}
               </div>
             </div>
 

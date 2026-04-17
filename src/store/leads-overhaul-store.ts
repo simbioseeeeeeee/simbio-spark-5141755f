@@ -3,9 +3,29 @@ import { Lead } from "@/types/lead";
 
 const PAGE_SIZE = 50;
 
+// mdewbruvzrrxezsbyzmq tem socios como colunas flat (socio1_nome...socio5_nome).
+// Aqui sintetizamos em array pra manter compatibilidade com Lead.socios[].
+function flatSocios(row: any) {
+  const out: any[] = [];
+  for (let i = 1; i <= 5; i++) {
+    const nome = row[`socio${i}_nome`];
+    if (!nome) continue;
+    out.push({
+      nome,
+      telefone1: row[`socio${i}_telefone1`] || undefined,
+      telefone2: row[`socio${i}_telefone2`] || undefined,
+      celular1: row[`socio${i}_celular1`] || undefined,
+      celular2: row[`socio${i}_celular2`] || undefined,
+      email1: row[`socio${i}_email1`] || undefined,
+    });
+  }
+  return out;
+}
+
 function rowToLead(row: any): Lead {
   return {
-    id: row.id,
+    // PK oficial do mdew é cnpj; mantém id pra React keys e compat
+    id: row.id || row.cnpj || "",
     cnpj: row.cnpj || "",
     razao_social: row.razao_social || "",
     fantasia: row.fantasia || "",
@@ -25,21 +45,21 @@ function rowToLead(row: any): Lead {
     celular2: row.celular2 || "",
     email1: row.email1 || "",
     email2: row.email2 || "",
-    socios: Array.isArray(row.socios) ? row.socios : [],
+    socios: Array.isArray(row.socios) ? row.socios : flatSocios(row),
     status_sdr: row.status_sdr || "A Contatar",
-    possui_site: row.possui_site || false,
+    possui_site: row.possui_site ?? false,
     url_site: row.url_site || "",
-    instagram_ativo: row.instagram_ativo || false,
+    instagram_ativo: row.instagram_ativo ?? false,
     url_instagram: row.url_instagram || "",
-    faz_anuncios: row.faz_anuncios || false,
-    whatsapp_automacao: row.whatsapp_automacao || false,
-    whatsapp_humano: row.whatsapp_humano || false,
+    faz_anuncios: row.faz_anuncios ?? false,
+    whatsapp_automacao: row.whatsapp_automacao ?? false,
+    whatsapp_humano: row.whatsapp_humano ?? false,
     observacoes_sdr: row.observacoes_sdr || "",
     estagio_funil: row.estagio_funil || null,
     valor_negocio_estimado: row.valor_negocio_estimado ?? null,
     data_proximo_passo: row.data_proximo_passo || null,
     observacoes_closer: row.observacoes_closer || "",
-    pesquisa_realizada: row.pesquisa_realizada || false,
+    pesquisa_realizada: row.pesquisa_realizada ?? false,
     lead_score: row.lead_score ?? null,
     dia_cadencia: row.dia_cadencia ?? 0,
     status_cadencia: row.status_cadencia || "ativo",
@@ -47,16 +67,28 @@ function rowToLead(row: any): Lead {
     updated_at: row.updated_at ?? null,
     origem_lead: row.origem_lead ?? null,
     tipo_lead: row.tipo_lead ?? null,
-    owner_id: row.owner_id || null,
-    sdr_id: row.sdr_id || null,
+    owner_id: row.owner_id || row.responsavel_closer || null,
+    sdr_id: row.sdr_id || row.responsavel_sdr || null,
     canal_preferido: row.canal_preferido || "nao_definido",
+    // Campos nativos do mdew
+    responsavel_sdr: row.responsavel_sdr || null,
+    responsavel_closer: row.responsavel_closer || null,
+    motivo_perda: row.motivo_perda || null,
+    tentativas_followup: row.tentativas_followup ?? null,
+    data_ultimo_contato: row.data_ultimo_contato || null,
+    qtde_funcionarios: row.qtde_funcionarios ?? null,
+    cnae: row.cnae || null,
+    cnae_grupo: row.cnae_grupo || null,
+    cnae_setor: row.cnae_setor || null,
+    tipo_empresa: row.tipo_empresa || null,
   };
 }
 
 export type StatusTab =
   | "all"
   | "A Contatar"
-  | "Em Qualificação"
+  | "Prospectado"
+  | "Qualificado"
   | "Reunião Agendada"
   | "Negociação"
   | "Cliente Ativo"
@@ -84,15 +116,17 @@ export interface OverhaulResult {
 }
 
 function applyCommonFilters(query: any, q: OverhaulQuery) {
-  // Tab by status_sdr
+  // Tab by status_sdr — mdew usa: A Contatar, Prospectado, Qualificado,
+  // Reunião Agendada, Cliente Ativo, Desqualificado. "Negociação" só existe em estagio_funil.
   if (q.tab !== "all") {
     if (q.tab === "Desqualificado") {
       query = query.like("status_sdr", "Desqualificado%");
     } else if (q.tab === "Negociação") {
-      // no status_sdr dedicado — filtra por estagio_funil
-      query = query.in("estagio_funil", ["Proposta Enviada", "Em Negociação", "Reunião Realizada"]);
+      // não tem status_sdr — filtra por estagio_funil (aceita ambas variantes)
+      query = query.in("estagio_funil", ["Negociação", "Em Negociação", "Proposta Enviada", "Reunião Realizada"]);
     } else if (q.tab === "Cliente Ativo") {
-      query = query.eq("estagio_funil", "Fechado Ganho");
+      // casa status_sdr OU estagio_funil=Fechado Ganho
+      query = query.or("status_sdr.eq.Cliente Ativo,estagio_funil.eq.Fechado Ganho");
     } else {
       query = query.eq("status_sdr", q.tab);
     }
@@ -109,7 +143,8 @@ function applyCommonFilters(query: any, q: OverhaulQuery) {
   }
 
   if (q.responsavelId) {
-    query = query.eq("sdr_id", q.responsavelId);
+    // mdew usa responsavel_sdr (string nome), não sdr_id UUID
+    query = query.eq("responsavel_sdr", q.responsavelId);
   }
 
   if (q.cidade && q.cidade !== "__all__") {
@@ -210,26 +245,54 @@ export async function getLeadByCnpj(cnpj: string): Promise<Lead | null> {
   return data ? rowToLead(data) : null;
 }
 
-/** Lead por UUID */
-export async function getLeadById(id: string): Promise<Lead | null> {
-  const { data, error } = await supabase
+/** Lead por id/cnpj — mdew usa cnpj como PK. Tenta cnpj primeiro. */
+export async function getLeadById(idOrCnpj: string): Promise<Lead | null> {
+  if (!idOrCnpj) return null;
+  // cnpj (PK no mdew)
+  const byCnpj = await supabase
     .from("leads")
     .select("*")
-    .eq("id", id)
+    .eq("cnpj", idOrCnpj)
     .maybeSingle();
-  if (error) throw error;
-  return data ? rowToLead(data) : null;
+  if (byCnpj.data) return rowToLead(byCnpj.data);
+  // fallback: id UUID (schema simbio-spark antigo)
+  try {
+    const byId = await supabase
+      .from("leads")
+      .select("*")
+      .eq("id", idOrCnpj)
+      .maybeSingle();
+    if (byId.data) return rowToLead(byId.data);
+  } catch {
+    // col id não existe no mdew — ignora
+  }
+  return null;
 }
 
-/** Valores distintos de responsável (sdr_id ligado ao user_roles) */
+/** Valores distintos de responsável — lê direto da tabela leads (mdew não tem user_roles) */
 export async function getDistinctResponsaveis(): Promise<
   { user_id: string; nome: string; role: string }[]
 > {
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("user_id, nome, role");
-  if (error) throw error;
-  return (data || []) as any[];
+  const [sdrs, closers] = await Promise.all([
+    supabase.from("leads").select("responsavel_sdr").not("responsavel_sdr", "is", null).limit(5000),
+    supabase.from("leads").select("responsavel_closer").not("responsavel_closer", "is", null).limit(5000),
+  ]);
+
+  const names = new Map<string, string>();
+  (sdrs.data || []).forEach((r: any) => {
+    const n = (r.responsavel_sdr || "").trim();
+    if (n) names.set(n, "sdr");
+  });
+  (closers.data || []).forEach((r: any) => {
+    const n = (r.responsavel_closer || "").trim();
+    if (n) {
+      names.set(n, names.get(n) === "sdr" ? "sdr+closer" : "closer");
+    }
+  });
+
+  return Array.from(names.entries())
+    .map(([nome, role]) => ({ user_id: nome, nome, role }))
+    .sort((a, b) => a.nome.localeCompare(b.nome));
 }
 
 /** Distribuição agregada por origem_lead (para dashboard pizza) */
