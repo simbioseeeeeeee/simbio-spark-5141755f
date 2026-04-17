@@ -16,7 +16,7 @@ import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import {
-  Crosshair, List, Columns3, BarChart3, LogOut, Building2, Megaphone, CalendarClock, Phone,
+  Crosshair, List, Columns3, BarChart3, LogOut, Building2, Megaphone, CalendarClock, Phone, Sparkles, Home,
 } from "lucide-react";
 
 interface NavItem {
@@ -25,7 +25,13 @@ interface NavItem {
   icon: React.ElementType;
 }
 
+const NEW_ITEMS: NavItem[] = [
+  { title: "Dashboard", url: "/dashboard", icon: Home },
+  { title: "Leads", url: "/leads", icon: Sparkles },
+];
+
 const SDR_ITEMS: NavItem[] = [
+  ...NEW_ITEMS,
   { title: "Foco de Hoje", url: "/sdr", icon: Crosshair },
   { title: "Explorador", url: "/sdr/explorador", icon: List },
   { title: "Anúncios", url: "/sdr/anuncios", icon: Megaphone },
@@ -34,6 +40,7 @@ const SDR_ITEMS: NavItem[] = [
 ];
 
 const CLOSER_ITEMS: NavItem[] = [
+  ...NEW_ITEMS,
   { title: "Pipeline", url: "/closer", icon: Columns3 },
   { title: "Explorador", url: "/closer/explorador", icon: List },
   { title: "Ligações", url: "/ligacoes", icon: Phone },
@@ -41,6 +48,7 @@ const CLOSER_ITEMS: NavItem[] = [
 ];
 
 const MANAGER_ITEMS: NavItem[] = [
+  ...NEW_ITEMS,
   { title: "Analytics", url: "/manager", icon: BarChart3 },
   { title: "Cadência SDR", url: "/manager/cadencia", icon: Crosshair },
   { title: "Pipeline Closer", url: "/manager/pipeline", icon: Columns3 },

@@ -16,6 +16,57 @@ export interface Socio {
 
 export type CanalPreferido = "whatsapp" | "telefone" | "email" | "linkedin" | "nao_definido";
 
+export type OrigemLead =
+  | "receita_federal"
+  | "bitrix_migrado"
+  | "whatsapp_entrante"
+  | "facebook_ads"
+  | "teste"
+  | "outros";
+
+export type TipoLead =
+  | "imobiliaria_rf"
+  | "programa_acelerador"
+  | "lead_outros";
+
+export const ORIGEM_OPTIONS: { value: OrigemLead; label: string }[] = [
+  { value: "receita_federal", label: "Receita Federal" },
+  { value: "bitrix_migrado", label: "Bitrix Migrado" },
+  { value: "whatsapp_entrante", label: "WhatsApp Entrante" },
+  { value: "facebook_ads", label: "Facebook Ads" },
+  { value: "teste", label: "Teste" },
+];
+
+export const TIPO_OPTIONS: { value: TipoLead; label: string }[] = [
+  { value: "imobiliaria_rf", label: "Imobiliária (RF)" },
+  { value: "programa_acelerador", label: "Programa Acelerador" },
+  { value: "lead_outros", label: "Outros" },
+];
+
+export const ORIGEM_BADGE_CLASS: Record<string, string> = {
+  receita_federal: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30",
+  bitrix_migrado: "bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/30",
+  whatsapp_entrante: "bg-green-500/15 text-green-700 dark:text-green-300 border border-green-500/30",
+  facebook_ads: "bg-pink-500/15 text-pink-700 dark:text-pink-300 border border-pink-500/30",
+  teste: "bg-muted text-muted-foreground border",
+  outros: "bg-muted text-muted-foreground border",
+};
+
+export const ORIGEM_LABEL: Record<string, string> = {
+  receita_federal: "Receita Federal",
+  bitrix_migrado: "Bitrix",
+  whatsapp_entrante: "WhatsApp",
+  facebook_ads: "Facebook Ads",
+  teste: "Teste",
+  outros: "Outros",
+};
+
+export const TIPO_LABEL: Record<string, string> = {
+  imobiliaria_rf: "Imobiliária (RF)",
+  programa_acelerador: "Acelerador",
+  lead_outros: "Outros",
+};
+
 export interface Lead {
   id: string;
   cnpj: string;
@@ -56,9 +107,23 @@ export interface Lead {
   dia_cadencia: number;
   status_cadencia: string;
   created_at: string;
+  updated_at?: string | null;
+  origem_lead?: string | null;
+  tipo_lead?: string | null;
   owner_id?: string | null;
   sdr_id?: string | null;
   canal_preferido?: CanalPreferido;
+  // Campos reais do Supabase mdewbruvzrrxezsbyzmq (snake_case)
+  responsavel_sdr?: string | null;
+  responsavel_closer?: string | null;
+  motivo_perda?: string | null;
+  tentativas_followup?: number | null;
+  data_ultimo_contato?: string | null;
+  qtde_funcionarios?: number | null;
+  cnae?: string | null;
+  cnae_grupo?: string | null;
+  cnae_setor?: string | null;
+  tipo_empresa?: string | null;
 }
 
 export interface Atividade {
