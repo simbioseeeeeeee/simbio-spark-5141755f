@@ -136,6 +136,7 @@ export type Database = {
           numero: string | null
           observacoes_closer: string | null
           observacoes_sdr: string | null
+          origem_lead: string | null
           owner_id: string | null
           pesquisa_realizada: boolean
           possui_site: boolean
@@ -147,7 +148,9 @@ export type Database = {
           status_sdr: string
           telefone1: string | null
           telefone2: string | null
+          tipo_lead: string | null
           uf: string | null
+          updated_at: string | null
           url_instagram: string | null
           url_site: string | null
           valor_negocio_estimado: number | null
@@ -180,6 +183,7 @@ export type Database = {
           numero?: string | null
           observacoes_closer?: string | null
           observacoes_sdr?: string | null
+          origem_lead?: string | null
           owner_id?: string | null
           pesquisa_realizada?: boolean
           possui_site?: boolean
@@ -191,7 +195,9 @@ export type Database = {
           status_sdr?: string
           telefone1?: string | null
           telefone2?: string | null
+          tipo_lead?: string | null
           uf?: string | null
+          updated_at?: string | null
           url_instagram?: string | null
           url_site?: string | null
           valor_negocio_estimado?: number | null
@@ -224,6 +230,7 @@ export type Database = {
           numero?: string | null
           observacoes_closer?: string | null
           observacoes_sdr?: string | null
+          origem_lead?: string | null
           owner_id?: string | null
           pesquisa_realizada?: boolean
           possui_site?: boolean
@@ -235,7 +242,9 @@ export type Database = {
           status_sdr?: string
           telefone1?: string | null
           telefone2?: string | null
+          tipo_lead?: string | null
           uf?: string | null
+          updated_at?: string | null
           url_instagram?: string | null
           url_site?: string | null
           valor_negocio_estimado?: number | null
