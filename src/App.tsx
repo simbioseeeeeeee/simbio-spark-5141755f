@@ -12,6 +12,8 @@ import CloserWorkspace from "./pages/CloserWorkspace";
 import ManagerWorkspace from "./pages/ManagerWorkspace";
 import FollowUps from "./pages/FollowUps";
 import Ligacoes from "./pages/Ligacoes";
+import LeadsOverhaul from "./pages/LeadsOverhaul";
+import DashboardOverhaul from "./pages/DashboardOverhaul";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +39,8 @@ const App = () => (
             <Route path="/manager/explorador" element={<ProtectedRoute allowedRoles={["manager"]}><ManagerWorkspace /></ProtectedRoute>} />
             <Route path="/follow-ups" element={<ProtectedRoute allowedRoles={["sdr", "closer", "manager"]}><FollowUps /></ProtectedRoute>} />
             <Route path="/ligacoes" element={<ProtectedRoute allowedRoles={["sdr", "closer", "manager"]}><Ligacoes /></ProtectedRoute>} />
+            <Route path="/leads" element={<ProtectedRoute allowedRoles={["sdr", "closer", "manager"]}><LeadsOverhaul /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["sdr", "closer", "manager"]}><DashboardOverhaul /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
