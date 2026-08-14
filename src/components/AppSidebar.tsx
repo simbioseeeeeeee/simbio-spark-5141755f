@@ -16,7 +16,8 @@ import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import {
-  Crosshair, List, Columns3, BarChart3, LogOut, Building2, Megaphone, CalendarClock, Phone, Sparkles, Home,
+  Crosshair, List, Columns3, BarChart3, LogOut, Building2, Megaphone, CalendarClock, Phone, Sparkles, Home, Activity,
+  MessageSquare, Instagram, ListChecks, Clapperboard,
 } from "lucide-react";
 
 interface NavItem {
@@ -26,6 +27,12 @@ interface NavItem {
 }
 
 const NEW_ITEMS: NavItem[] = [
+  { title: "Plano do Sprint", url: "/plano", icon: ListChecks },
+  { title: "Criativos", url: "/criativos", icon: Clapperboard },
+  { title: "Desempenho", url: "/campanhas", icon: BarChart3 },
+  { title: "Metas do Dia", url: "/metas", icon: Crosshair },
+  { title: "Conversas", url: "/conversas", icon: MessageSquare },
+  { title: "Social Selling", url: "/social-selling", icon: Instagram },
   { title: "Dashboard", url: "/dashboard", icon: Home },
   { title: "Leads", url: "/leads", icon: Sparkles },
 ];
@@ -55,6 +62,7 @@ const MANAGER_ITEMS: NavItem[] = [
   { title: "Explorador", url: "/manager/explorador", icon: List },
   { title: "Ligações", url: "/ligacoes", icon: Phone },
   { title: "Follow-ups", url: "/follow-ups", icon: CalendarClock },
+  { title: "Saúde do Sistema", url: "/manager/sistema", icon: Activity },
 ];
 
 const ROLE_LABELS: Record<AppRole, string> = {
