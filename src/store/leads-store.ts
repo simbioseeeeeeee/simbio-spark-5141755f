@@ -5,7 +5,10 @@ const PAGE_SIZE = 50;
 
 function rowToLead(row: any): Lead {
   return {
-    id: row.id,
+    // A tabela leads NAO tem coluna id — a PK e cnpj. Sem o fallback, todo card do
+    // Kanban nascia com id undefined: o drag quebrava, atividades nao carregavam e o
+    // LeadProfile abria VAZIO (comparava undefined === undefined e usava o form nulo).
+    id: row.id || row.cnpj,
     cnpj: row.cnpj || "",
     razao_social: row.razao_social || "",
     fantasia: row.fantasia || "",
@@ -327,7 +330,8 @@ export async function updateLead(lead: Lead): Promise<Lead> {
       status_cadencia: lead.status_cadencia,
       canal_preferido: lead.canal_preferido || "nao_definido",
     })
-    .eq("id", lead.id)
+    // a PK de leads e cnpj — nao existe coluna id (era a razao de o drag nunca salvar)
+    .eq("cnpj", lead.cnpj || lead.id)
     .select()
     .single();
   if (error) throw error;
@@ -339,27 +343,15 @@ export async function registrarReuniaoAgendada(
   userId?: string,
   nota = "Status alterado manualmente para Reunião Agendada."
 ): Promise<void> {
-  const { data: lastActivity, error: lastActivityError } = await supabase
-    .from("atividades")
-    .select("tipo_atividade, sdr_id, owner_id")
-    .eq("lead_id", lead.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (lastActivityError) throw lastActivityError;
-
-  const insertData: any = {
-    lead_id: lead.id,
-    tipo_atividade: lastActivity?.tipo_atividade || "Ligação",
-    resultado: "Agendou Reunião",
+  // atividades usa lead_cnpj/created_by (nao lead_id/sdr_id/owner_id) e os valores
+  // canonicos da casa sao tipo "reuniao" / resultado "agendado".
+  const { error } = await supabase.from("atividades").insert({
+    lead_cnpj: lead.id,
+    tipo_atividade: "reuniao",
+    resultado: "agendado",
     nota,
-  };
-
-  if (lead.owner_id || lastActivity?.owner_id) insertData.owner_id = lead.owner_id || lastActivity?.owner_id;
-  if (lead.sdr_id || lastActivity?.sdr_id || userId) insertData.sdr_id = lead.sdr_id || lastActivity?.sdr_id || userId;
-
-  const { error } = await supabase.from("atividades").insert(insertData);
+    created_by: userId || "crm",
+  });
   if (error) throw error;
 }
 
