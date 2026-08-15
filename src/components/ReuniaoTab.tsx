@@ -403,7 +403,8 @@ export function ReuniaoTab({ cnpj, nome, cidade, estagioFunil, email, whatsapp, 
                     onChange={(e) => setFc({ ...fc, exclusividade_cidade: e.target.value })} />
                   <select value={fc.exclusividade_meses} className="rounded-md border bg-background px-2"
                     onChange={(e) => setFc({ ...fc, exclusividade_meses: e.target.value })}>
-                    <option value="3">3 meses</option><option value="6">6 meses</option><option value="12">12 meses</option>
+                    {/* política 14/08: começa em 3, máximo 6 — nunca 12, nunca aberta (R5) */}
+                    <option value="3">3 meses</option><option value="6">6 meses</option>
                   </select>
                 </div>
               )}
