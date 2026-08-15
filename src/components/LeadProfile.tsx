@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ReuniaoTab } from "@/components/ReuniaoTab";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/hooks/use-toast";
@@ -272,6 +273,7 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
             <TabsList className="h-8">
               <TabsTrigger value="ficha" className="text-xs">Ficha</TabsTrigger>
               <TabsTrigger value="timeline" className="text-xs">Timeline</TabsTrigger>
+              <TabsTrigger value="reuniao" className="text-xs">Reunião</TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="ficha" className="mt-0">
@@ -502,6 +504,19 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
           </TabsContent>
           <TabsContent value="timeline" className="mt-0 p-6 overflow-y-auto max-h-[calc(100vh-220px)]">
             <LeadTimeline leadId={current.id} />
+          </TabsContent>
+          <TabsContent value="reuniao" className="mt-0">
+            {current && (
+              <ReuniaoTab
+                cnpj={current.cnpj || current.id}
+                nome={current.fantasia || current.razao_social || ""}
+                cidade={current.cidade || null}
+                estagioFunil={current.estagio_funil || null}
+                email={current.email1 || null}
+                whatsapp={current.celular1 || current.telefone1 || null}
+                userName={user?.email?.split("@")[0] || "crm"}
+              />
+            )}
           </TabsContent>
         </Tabs>
       </SheetContent>

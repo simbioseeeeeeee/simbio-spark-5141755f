@@ -1,6 +1,7 @@
 export type LeadStatus = "A Contatar" | "Em Qualificação" | "Reunião Agendada" | "Desqualificado" | "Desqualificado - Sem Perfil" | "Desqualificado - Sem Budget" | "Desqualificado - Sem Interesse";
 
-export type EstagioFunil = "Reunião Agendada" | "Reunião Realizada" | "Proposta Enviada" | "Em Negociação" | "Fechado Ganho" | "Fechado Perdido";
+export type EstagioFunil = "Reunião Agendada" | "Reunião Realizada" | "Proposta Enviada"
+  | "Aguardando Aceite" | "Em Negociação" | "Fechado Ganho" | "Fechado Perdido";
 
 export type TipoAtividade = "WhatsApp" | "Ligação" | "Email" | "Pesquisa" | "Visita";
 export type ResultadoAtividade = "Conectado" | "Atendeu" | "Respondeu" | "Não Atendeu" | "Caixa Postal" | "Sem Resposta" | "Agendou Reunião" | "Recusou" | "Pesquisa Concluída";
@@ -150,6 +151,7 @@ export const ESTAGIO_FUNIL_OPTIONS: EstagioFunil[] = [
   "Reunião Agendada",
   "Reunião Realizada",
   "Proposta Enviada",
+  "Aguardando Aceite",
   "Em Negociação",
   "Fechado Ganho",
   "Fechado Perdido",
@@ -176,6 +178,7 @@ export const ESTAGIO_COLORS: Record<EstagioFunil, string> = {
   "Reunião Agendada": "bg-primary/15 text-primary",
   "Reunião Realizada": "bg-warning/15 text-warning",
   "Proposta Enviada": "bg-primary/15 text-primary",
+  "Aguardando Aceite": "bg-warning/15 text-warning",
   "Em Negociação": "bg-warning/15 text-warning",
   "Fechado Ganho": "bg-success/15 text-success",
   "Fechado Perdido": "bg-destructive/15 text-destructive",
