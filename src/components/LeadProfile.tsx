@@ -25,7 +25,7 @@ import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
-import { validateSdrTransition } from "@/lib/sales-pipeline";
+import { allowedSdrTargets, validateSdrTransition } from "@/lib/sales-pipeline";
 import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles, CheckCircle2, XCircle } from "lucide-react";
 
 // calculateScore is now imported from types/lead
@@ -412,9 +412,19 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                   <Select value={current.status_sdr} onValueChange={(v) => setField("status_sdr", v as LeadStatus)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      {/* só o que a matriz aceita a partir do status atual — oferecer
+                          o resto só produzia "Transição não permitida" ao salvar */}
+                      {allowedSdrTargets(current.status_sdr)
+                        .filter((s) => s !== "Reunião Agendada")
+                        .map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  {current.status_sdr === "Qualificado" && (
+                    <p className="text-xs text-muted-foreground">
+                      Para marcar reunião, use o botão <strong>Agendar reunião</strong> — ele cria o
+                      evento na agenda e o link do Meet.
+                    </p>
+                  )}
                 </div>
 
                 <Separator />

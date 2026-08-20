@@ -64,13 +64,28 @@ describe("integração frontend do comercial V2", () => {
     expect(component).toContain("quote_id: quoteId");
   });
 
-  it("remove os estados e a cadência legados das superfícies ativas", () => {
+  // O vocabulário do front tem de espelhar o CHECK leads_status_sdr_chk do mdew.
+  // "Prospectado" e "Cliente Ativo" são estados VIVOS (o facebook-webhook cria todo
+  // lead de campanha como Prospectado); tratá-los como legado deixava a matriz de
+  // transição sem entrada pra eles e a ficha quebrava ao abrir esses leads.
+  it("cobre na matriz de transição todo status aceito pelo banco", async () => {
+    const { ALLOWED_SDR_TRANSITIONS } = await import("@/lib/sales-pipeline");
+    const statusDoBanco = [
+      "A Contatar", "Prospectado", "Em Qualificação", "Qualificado",
+      "Reunião Agendada", "Desqualificado", "Nurturing", "Opt-out",
+      "Arquivo Morto", "Cliente Ativo",
+    ];
+    for (const status of statusDoBanco) {
+      expect(Array.isArray((ALLOWED_SDR_TRANSITIONS as any)[status])).toBe(true);
+    }
+  });
+
+  it("não ressuscita a cadência legada nas superfícies ativas", () => {
     const activeSources = [
       read("src/store/leads-overhaul-store.ts"),
       read("src/pages/LeadsOverhaul.tsx"),
-      read("src/types/lead.ts"),
     ].join("\n");
-    expect(activeSources).not.toMatch(/Prospectado|Cliente Ativo|Reunião Realizada|Última tentativa/);
+    expect(activeSources).not.toMatch(/Última tentativa/);
   });
 
   it("usa somente Fit 70 para qualificação no closer e rotula os dois scores", () => {

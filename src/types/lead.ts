@@ -1,14 +1,21 @@
 export const PLAYBOOK_VERSION = "simbiose-sales-v2@2.1.0" as const;
 export const CATALOG_VERSION = "2.1.0" as const;
 
+// Espelha o CHECK leads_status_sdr_chk. "Prospectado" é como o
+// facebook-webhook cria todo lead de campanha; "Arquivo Morto" e "Cliente
+// Ativo" são legados da base — sem eles a matriz de transição fica undefined
+// e a ficha do lead quebra ao abrir.
 export type LeadStatus =
   | "A Contatar"
+  | "Prospectado"
   | "Em Qualificação"
   | "Qualificado"
   | "Reunião Agendada"
   | "Nurturing"
   | "Desqualificado"
-  | "Opt-out";
+  | "Opt-out"
+  | "Arquivo Morto"
+  | "Cliente Ativo";
 
 export type EstagioFunil =
   | "Reunião Agendada"
@@ -190,6 +197,7 @@ export interface Atividade {
 
 export const STATUS_OPTIONS: LeadStatus[] = [
   "A Contatar",
+  "Prospectado",
   "Em Qualificação",
   "Qualificado",
   "Reunião Agendada",
@@ -234,11 +242,16 @@ export const TIPO_ATIVIDADE_OPTIONS: TipoAtividade[] = ["WhatsApp", "Ligação",
 
 export const RESULTADO_OPTIONS: ResultadoAtividade[] = [
   "Conectado", "Atendeu", "Respondeu", "Não Atendeu",
-  "Caixa Postal", "Sem Resposta", "Agendou Reunião", "Recusou", "Pesquisa Concluída",
+  // "Agendou Reunião" sai da lista de propósito: registrar reunião exige evento real
+  // na agenda (botão "Agendar reunião" na ficha). Escolher aqui só dava erro.
+  "Caixa Postal", "Sem Resposta", "Recusou", "Pesquisa Concluída",
 ];
 
 export const STATUS_COLORS: Record<LeadStatus, string> = {
   "A Contatar": "bg-muted text-muted-foreground",
+  "Prospectado": "bg-warning/15 text-warning border border-warning/30",
+  "Arquivo Morto": "bg-muted text-muted-foreground border",
+  "Cliente Ativo": "bg-success/15 text-success border border-success/30",
   "Em Qualificação": "bg-warning/15 text-warning border border-warning/30",
   "Qualificado": "bg-success/15 text-success border border-success/30",
   "Reunião Agendada": "bg-primary/15 text-primary border border-primary/30",

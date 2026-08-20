@@ -61,14 +61,23 @@ export const ALLOWED_PIPELINE_TRANSITIONS: Record<EstagioFunil, readonly Estagio
 };
 
 export const ALLOWED_SDR_TRANSITIONS: Record<LeadStatus, readonly LeadStatus[]> = {
-  "A Contatar": ["Em Qualificação", "Nurturing", "Desqualificado", "Opt-out"],
+  "A Contatar": ["Prospectado", "Em Qualificação", "Nurturing", "Desqualificado", "Opt-out"],
+  // Prospectado = o webhook já mandou o primeiro toque e o lead ainda não respondeu.
+  "Prospectado": ["Em Qualificação", "Qualificado", "Nurturing", "Desqualificado", "Opt-out"],
   "Em Qualificação": ["Qualificado", "Nurturing", "Desqualificado", "Opt-out"],
-  "Qualificado": ["Reunião Agendada", "Nurturing", "Desqualificado", "Opt-out"],
-  "Reunião Agendada": ["Nurturing", "Opt-out"],
-  "Nurturing": ["Em Qualificação", "Desqualificado", "Opt-out"],
-  "Desqualificado": [],
+  "Qualificado": ["Reunião Agendada", "Em Qualificação", "Nurturing", "Desqualificado", "Opt-out"],
+  "Reunião Agendada": ["Qualificado", "Nurturing", "Opt-out"],
+  "Nurturing": ["Em Qualificação", "Qualificado", "Desqualificado", "Opt-out"],
+  "Desqualificado": ["Nurturing"],
   "Opt-out": [],
+  "Arquivo Morto": ["A Contatar", "Nurturing"],
+  "Cliente Ativo": ["Nurturing"],
 };
+
+/** Status que a UI pode oferecer a partir do atual, incluindo ficar onde está. */
+export function allowedSdrTargets(current: LeadStatus): LeadStatus[] {
+  return [current, ...(ALLOWED_SDR_TRANSITIONS[current] ?? [])];
+}
 
 export function validateSdrTransition(
   current: LeadStatus,
@@ -79,7 +88,9 @@ export function validateSdrTransition(
 ): TransitionValidation {
   if (current === target) return { ok: true };
   if (target === "Opt-out") return { ok: true };
-  if (!ALLOWED_SDR_TRANSITIONS[current].includes(target)) {
+  // status vindo do banco que a matriz não conhece não pode derrubar a ficha
+  const permitidos = ALLOWED_SDR_TRANSITIONS[current] ?? [];
+  if (!permitidos.includes(target)) {
     return { ok: false, reason: `Transição SDR não permitida: ${current} → ${target}.` };
   }
   if (target === "Reunião Agendada" && !eventId?.trim()) {

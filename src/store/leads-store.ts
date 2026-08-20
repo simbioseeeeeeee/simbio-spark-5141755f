@@ -33,6 +33,26 @@ export function mapActivityToDatabase(tipo: string, resultado: string) {
   return { tipoAtividade, resultadoAtividade };
 }
 
+// mdew guarda sócio em coluna flat (socio1_nome … socio5_email1). Ler row.socios
+// devolvia sempre [] e o Quadro Societário nascia vazio — justo os telefones que
+// a SDR usa pra ligar quando o número principal não atende.
+function flatSocios(row: any): Socio[] {
+  const out: Socio[] = [];
+  for (let i = 1; i <= 5; i++) {
+    const nome = row[`socio${i}_nome`];
+    if (!nome) continue;
+    out.push({
+      nome,
+      telefone1: row[`socio${i}_telefone1`] || undefined,
+      telefone2: row[`socio${i}_telefone2`] || undefined,
+      celular1: row[`socio${i}_celular1`] || undefined,
+      celular2: row[`socio${i}_celular2`] || undefined,
+      email1: row[`socio${i}_email1`] || undefined,
+    } as Socio);
+  }
+  return out;
+}
+
 function rowToLead(row: any): Lead {
   return {
     // A tabela leads NAO tem coluna id — a PK e cnpj. Sem o fallback, todo card do
@@ -58,7 +78,7 @@ function rowToLead(row: any): Lead {
     celular2: row.celular2 || "",
     email1: row.email1 || "",
     email2: row.email2 || "",
-    socios: Array.isArray(row.socios) ? (row.socios as Socio[]) : [],
+    socios: Array.isArray(row.socios) && row.socios.length ? (row.socios as Socio[]) : flatSocios(row),
     status_sdr: row.status_sdr || "A Contatar",
     possui_site: row.possui_site || false,
     url_site: row.url_site || "",

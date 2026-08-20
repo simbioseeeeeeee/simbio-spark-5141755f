@@ -9,6 +9,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { OrigemBadge, TipoBadge } from "@/components/OrigemBadge";
+import { LeadProfile } from "@/components/LeadProfile";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -36,6 +37,7 @@ export function LeadDetailSheet({ leadId, cnpj, open, onOpenChange }: Props) {
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSocios, setShowSocios] = useState(false);
+  const [editando, setEditando] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -318,16 +320,31 @@ export function LeadDetailSheet({ leadId, cnpj, open, onOpenChange }: Props) {
 
             <Separator />
             <div className="flex gap-2">
-              <Button variant="default" className="flex-1" disabled>
-                Editar (em breve)
+              <Button variant="default" className="flex-1" onClick={() => setEditando(true)}>
+                Editar / avançar estágio
               </Button>
-              <Button variant="outline" className="flex-1" disabled>
-                Avançar estágio
+              <Button variant="outline" className="flex-1" asChild>
+                <a href={waUrl(lead.celular1 || lead.telefone1)} target="_blank" rel="noreferrer">
+                  Abrir WhatsApp
+                </a>
               </Button>
             </div>
           </div>
         )}
       </SheetContent>
+
+      {/* A ficha editável é o LeadProfile — o mesmo componente dos workspaces.
+          Antes esta gaveta era só leitura e os dois botões nasciam disabled, então
+          nenhum lead novo saía de "A Contatar" pela tela de Leads. */}
+      <LeadProfile
+        lead={lead}
+        open={editando}
+        onClose={() => setEditando(false)}
+        onSaved={(atualizado) => {
+          setLead(atualizado);
+          setEditando(false);
+        }}
+      />
     </Sheet>
   );
 }
