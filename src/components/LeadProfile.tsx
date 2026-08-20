@@ -622,10 +622,10 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                           {current.reuniao_url}
                         </a>
                       ) : (
-                        <p className="rounded-md bg-muted px-3 py-2 text-sm">Ainda não confirmado pelo Calendar</p>
+                        <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">Preenche sozinho em até 30 min</p>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground">Evidência somente leitura; alterações vêm do Calendar/Meet.</p>
+                    <p className="text-xs text-muted-foreground">Preenchido automaticamente: quando a Larissa agenda, quando a reunião entra no seu Google Calendar com o e-mail do lead (sincroniza a cada 30 min) ou, depois da reunião, pela transcrição do tl;dv.</p>
                   </div>
                 )}
 
