@@ -209,7 +209,9 @@ export function pontosDeMelhoria(a: Avaliacao, objecoesCategorias: CategoriaObje
 }
 
 export async function salvarAvaliacao(a: Avaliacao): Promise<string> {
-  if (!a.meeting_event_id?.trim()) throw new Error("A avaliação exige o event_id da reunião.");
+  // meeting_event_id deixou de ser obrigatório (21/08): reuniões antigas e as
+  // vindas do tl;dv não têm evento no Calendar — exigir bloqueava o closer de
+  // avaliar justamente as reuniões que aconteceram. Quando existir, vai junto.
   if (!a.desfecho) throw new Error("Selecione o desfecho da reunião.");
   if (a.desfecho !== "perdido" && !a.proximo_passo_data) {
     throw new Error("O desfecho exige próximo passo com data.");

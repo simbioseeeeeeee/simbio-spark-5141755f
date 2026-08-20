@@ -25,7 +25,7 @@ import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
-import { allowedSdrTargets, validateSdrTransition } from "@/lib/sales-pipeline";
+import { ALLOWED_PIPELINE_TRANSITIONS, allowedSdrTargets, isPipelineStage, validateSdrTransition } from "@/lib/sales-pipeline";
 import { Building2, MapPin, Phone, PhoneCall, MessageCircle, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles, CheckCircle2, XCircle } from "lucide-react";
 import { ligarParaLead, enviarWhatsAppLead } from "@/lib/api";
 
@@ -587,7 +587,13 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                   <Select value={current.estagio_funil || ""} onValueChange={(v) => setField("estagio_funil", (v || null) as EstagioFunil | null)}>
                     <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
-                      {ESTAGIO_FUNIL_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      {/* só transições válidas a partir do estágio atual — oferecer o
+                          resto só gerava erro de regra ao salvar (o "travado" de 21/08) */}
+                      {(current.estagio_funil && isPipelineStage(current.estagio_funil)
+                        ? [current.estagio_funil,
+                           ...(ALLOWED_PIPELINE_TRANSITIONS[current.estagio_funil] ?? [])]
+                        : ESTAGIO_FUNIL_OPTIONS
+                      ).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

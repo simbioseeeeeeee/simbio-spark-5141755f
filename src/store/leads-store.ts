@@ -53,6 +53,19 @@ function flatSocios(row: any): Socio[] {
   return out;
 }
 
+// O banco pode carregar vocabulário que o front não conhece (ex.: "Reunião
+// Realizada", que o pós-reunião gravou até 21/08). Normaliza na leitura pra
+// nenhum estágio desconhecido derrubar o quadro de novo.
+const ESTAGIO_ALIASES: Record<string, string> = {
+  "Reunião Realizada": "Diagnóstico Realizado",
+  "Negociação": "Em Negociação",
+};
+
+function normalizaEstagio(v: any): any {
+  if (!v) return v;
+  return ESTAGIO_ALIASES[String(v)] ?? v;
+}
+
 function rowToLead(row: any): Lead {
   return {
     // A tabela leads NAO tem coluna id — a PK e cnpj. Sem o fallback, todo card do
@@ -88,7 +101,7 @@ function rowToLead(row: any): Lead {
     whatsapp_automacao: row.whatsapp_automacao || false,
     whatsapp_humano: row.whatsapp_humano || false,
     observacoes_sdr: row.observacoes_sdr || "",
-    estagio_funil: row.estagio_funil || null,
+    estagio_funil: normalizaEstagio(row.estagio_funil) || null,
     data_proximo_passo: row.data_proximo_passo || null,
     observacoes_closer: row.observacoes_closer || "",
     pesquisa_realizada: row.pesquisa_realizada || false,

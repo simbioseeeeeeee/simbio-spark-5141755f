@@ -55,7 +55,11 @@ function rowToLead(row: any): Lead {
     whatsapp_automacao: row.whatsapp_automacao ?? false,
     whatsapp_humano: row.whatsapp_humano ?? false,
     observacoes_sdr: row.observacoes_sdr || "",
-    estagio_funil: row.estagio_funil || null,
+    // "Reunião Realizada"/"Negociação" são vocabulário legado do backend —
+    // sem normalizar, o lead some do quadro e transições dão erro
+    estagio_funil: ({ "Reunião Realizada": "Diagnóstico Realizado",
+                      "Negociação": "Em Negociação" } as Record<string, string>)[
+                     String(row.estagio_funil)] ?? row.estagio_funil ?? null,
     data_proximo_passo: row.data_proximo_passo || null,
     observacoes_closer: row.observacoes_closer || "",
     pesquisa_realizada: row.pesquisa_realizada ?? false,
