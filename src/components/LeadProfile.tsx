@@ -26,7 +26,8 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { allowedSdrTargets, validateSdrTransition } from "@/lib/sales-pipeline";
-import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles, CheckCircle2, XCircle } from "lucide-react";
+import { Building2, MapPin, Phone, PhoneCall, MessageCircle, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles, CheckCircle2, XCircle } from "lucide-react";
+import { ligarParaLead, enviarWhatsAppLead } from "@/lib/api";
 
 // calculateScore is now imported from types/lead
 
@@ -88,6 +89,37 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false);
   const [researching, setResearching] = useState(false);
   const [managerOverrideApproved, setManagerOverrideApproved] = useState(false);
+  const [acionando, setAcionando] = useState<"ligar" | "wpp" | null>(null);
+  const [compondoWpp, setCompondoWpp] = useState(false);
+  const [textoWpp, setTextoWpp] = useState("");
+
+  async function acionarLigacao() {
+    if (!current?.cnpj) return;
+    setAcionando("ligar");
+    try {
+      await ligarParaLead(current.cnpj);
+      toast({ title: "Ligação disparada", description: "A Larissa está ligando agora. O resultado cai na timeline." });
+    } catch (e: any) {
+      toast({ title: "Não consegui ligar", description: e?.message || "erro desconhecido", variant: "destructive" });
+    } finally {
+      setAcionando(null);
+    }
+  }
+
+  async function acionarWhatsApp() {
+    if (!current?.cnpj || !textoWpp.trim()) return;
+    setAcionando("wpp");
+    try {
+      await enviarWhatsAppLead(current.cnpj, textoWpp.trim());
+      toast({ title: "Mensagem enviada", description: "Saiu pelo número oficial da Simbiose." });
+      setTextoWpp("");
+      setCompondoWpp(false);
+    } catch (e: any) {
+      toast({ title: "Não enviei", description: e?.message || "erro desconhecido", variant: "destructive" });
+    } finally {
+      setAcionando(null);
+    }
+  }
 
   const current = form?.id === lead?.id ? form : lead;
 
@@ -316,6 +348,42 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
             </div>
             <ScoreBadge score={score} />
           </div>
+
+          {/* Ações diretas: a SDR trabalha o lead sem sair da ficha. */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" className="gap-1.5" disabled={acionando !== null}
+                    onClick={acionarLigacao}>
+              {acionando === "ligar"
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <PhoneCall className="h-3.5 w-3.5" />}
+              Larissa liga
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5"
+                    onClick={() => setCompondoWpp((v) => !v)}>
+              <MessageCircle className="h-3.5 w-3.5" />
+              WhatsApp oficial
+            </Button>
+          </div>
+          {compondoWpp && (
+            <div className="mt-2 space-y-2">
+              <Textarea
+                rows={3}
+                placeholder="Mensagem que sai pelo número oficial da Simbiose…"
+                value={textoWpp}
+                onChange={(e) => setTextoWpp(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <Button size="sm" disabled={acionando !== null || !textoWpp.trim()}
+                        onClick={acionarWhatsApp}>
+                  {acionando === "wpp" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Enviar
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setCompondoWpp(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
         </SheetHeader>
 
         <Tabs defaultValue="ficha" className="flex-1">

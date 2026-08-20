@@ -8,6 +8,8 @@ import { LeadProfile } from "@/components/LeadProfile";
 import { LeadExplorer } from "@/components/LeadExplorer";
 import { AdsExplorer } from "@/components/AdsExplorer";
 import { NewLeadModal } from "@/components/NewLeadModal";
+import { TarefasDoDia } from "@/components/TarefasDoDia";
+import { getLeadByCnpj } from "@/store/leads-overhaul-store";
 import { AppLayout } from "@/components/AppLayout";
 import { TerritorySelector } from "@/components/TerritorySelector";
 import { Button } from "@/components/ui/button";
@@ -99,6 +101,15 @@ function SdrFocoView() {
         <MetricCard label="Conexões Hoje" value={metrics.conexoes_hoje} icon={MessageSquare} color="bg-success/10 text-success" />
         <MetricCard label="Reuniões Agendadas" value={metrics.reunioes_hoje} icon={CalendarCheck} color="bg-primary/10 text-primary" />
       </div>
+
+      {/* Fila do dia (sales_tasks). Fica acima do "Foco de Hoje" porque é onde o
+          lead novo aparece: a cadência antiga só enxerga lead já pesquisado. */}
+      <TarefasDoDia
+        onAbrirLead={async (cnpj) => {
+          const lead = await getLeadByCnpj(cnpj).catch(() => null);
+          if (lead) setSelectedLead(lead);
+        }}
+      />
 
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
