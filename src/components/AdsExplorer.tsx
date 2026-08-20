@@ -21,11 +21,12 @@ interface AdResult {
   matchedLead?: Lead | null;
   searching?: boolean;
   creating?: boolean;
+  cnpjDraft?: string;
 }
 
 function rowToLead(row: any): Lead {
   return {
-    id: row.id,
+    id: row.cnpj || "",
     cnpj: row.cnpj || "",
     razao_social: row.razao_social || "",
     fantasia: row.fantasia || "",
@@ -56,16 +57,12 @@ function rowToLead(row: any): Lead {
     whatsapp_humano: row.whatsapp_humano || false,
     observacoes_sdr: row.observacoes_sdr || "",
     estagio_funil: row.estagio_funil || null,
-    valor_negocio_estimado: row.valor_negocio_estimado || null,
     data_proximo_passo: row.data_proximo_passo || null,
     observacoes_closer: row.observacoes_closer || "",
     pesquisa_realizada: row.pesquisa_realizada || false,
     lead_score: row.lead_score ?? null,
-    dia_cadencia: row.dia_cadencia ?? 0,
     status_cadencia: row.status_cadencia || "ativo",
     created_at: row.created_at,
-    owner_id: row.owner_id || null,
-    sdr_id: row.sdr_id || null,
   };
 }
 
@@ -112,6 +109,7 @@ export function AdsExplorer() {
         matchedLead: undefined,
         searching: false,
         creating: false,
+        cnpjDraft: "",
       }));
 
       setResults(ads);
@@ -145,7 +143,7 @@ export function AdsExplorer() {
             await supabase
               .from("leads")
               .update({ faz_anuncios: true })
-              .eq("id", match.id);
+              .eq("cnpj", match.cnpj);
             match.faz_anuncios = true;
           }
 
@@ -163,12 +161,18 @@ export function AdsExplorer() {
   }, [query, cidade]);
 
   const createLeadFromAd = useCallback(async (ad: AdResult, index: number) => {
+    const cnpj = (ad.cnpjDraft || "").replace(/\D/g, "");
+    if (cnpj.length !== 14) {
+      toast({ title: "CNPJ obrigatório", description: "Informe os 14 dígitos antes de criar o lead.", variant: "destructive" });
+      return;
+    }
     setResults((prev) => prev.map((r, idx) => idx === index ? { ...r, creating: true } : r));
 
     try {
       const { data, error } = await supabase
         .from("leads")
         .insert({
+          cnpj,
           razao_social: ad.anunciante,
           fantasia: ad.anunciante,
           faz_anuncios: true,
@@ -258,7 +262,7 @@ export function AdsExplorer() {
                     <div className="flex items-center gap-1"><BarChart3 className="h-3 w-3" /> Volume</div>
                   </TableHead>
                   <TableHead className="w-[200px]">Match na Base</TableHead>
-                  <TableHead className="w-[100px]"></TableHead>
+                  <TableHead className="w-[260px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -312,16 +316,28 @@ export function AdsExplorer() {
                           <ArrowRight className="h-4 w-4" />
                         </Button>
                       ) : ad.matchedLead === null ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1 text-xs"
-                          disabled={ad.creating}
-                          onClick={() => createLeadFromAd(ad, i)}
-                        >
-                          {ad.creating ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-3 w-3" />}
-                          Criar Lead
-                        </Button>
+                        <div className="flex min-w-[250px] items-center gap-2">
+                          <Input
+                            aria-label={`CNPJ de ${ad.anunciante}`}
+                            placeholder="CNPJ (14 dígitos)"
+                            className="h-8 font-mono text-xs"
+                            value={ad.cnpjDraft || ""}
+                            onChange={(event) => {
+                              const cnpjDraft = event.target.value;
+                              setResults((current) => current.map((item, idx) => idx === i ? { ...item, cnpjDraft } : item));
+                            }}
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="shrink-0 gap-1 text-xs"
+                            disabled={ad.creating}
+                            onClick={() => createLeadFromAd(ad, i)}
+                          >
+                            {ad.creating ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserPlus className="h-3 w-3" />}
+                            Criar
+                          </Button>
+                        </div>
                       ) : null}
                     </TableCell>
                   </TableRow>

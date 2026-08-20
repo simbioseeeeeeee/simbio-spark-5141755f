@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Lead, TIPO_ATIVIDADE_OPTIONS, RESULTADO_OPTIONS, CADENCE_STEPS, TipoAtividade, ResultadoAtividade } from "@/types/lead";
+import { Lead, TIPO_ATIVIDADE_OPTIONS, RESULTADO_OPTIONS, TipoAtividade, ResultadoAtividade } from "@/types/lead";
 import { registrarAtividade } from "@/store/leads-store";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -42,7 +42,7 @@ function ScoreBadge({ score }: { score: number | null }) {
   const color = score >= 70 ? "bg-success/15 text-success border-success/30"
     : score >= 40 ? "bg-warning/15 text-warning border-warning/30"
     : "bg-destructive/15 text-destructive border-destructive/30";
-  return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold border ${color}`}>{score} pts</span>;
+  return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold border ${color}`}>Pesquisa digital {score}/100</span>;
 }
 
 function QualBadge({ label, active, icon: Icon }: { label: string; active: boolean; icon: any }) {
@@ -62,8 +62,7 @@ export function ActivityModal({ lead, open, onClose, onDone, userId }: Props) {
 
   if (!lead) return null;
 
-  const step = CADENCE_STEPS[lead.dia_cadencia] || `Passo ${lead.dia_cadencia + 1}`;
-  const isResearchStep = lead.dia_cadencia === 0;
+  const isResearchStep = !lead.pesquisa_realizada;
   const searchName = lead.fantasia || lead.razao_social;
 
   const handleSubmit = async () => {
@@ -102,7 +101,9 @@ export function ActivityModal({ lead, open, onClose, onDone, userId }: Props) {
             <ScoreBadge score={lead.lead_score} />
           </div>
           <p className="text-xs text-primary font-medium mt-2">
-            📍 Dia {lead.dia_cadencia} — {step}
+            Próximo passo: {lead.data_proximo_passo
+              ? new Date(lead.data_proximo_passo).toLocaleString("pt-BR")
+              : "definir após este contato"}
           </p>
         </DialogHeader>
 

@@ -19,6 +19,13 @@ const ICON_MAP: Record<string, { icon: React.ElementType; color: string }> = {
   Email: { icon: Mail, color: "text-muted-foreground bg-muted" },
   Pesquisa: { icon: StickyNote, color: "text-warning bg-warning/10" },
   Visita: { icon: Calendar, color: "text-primary bg-primary/10" },
+  whatsapp_out: { icon: MessageCircle, color: "text-success bg-success/10" },
+  whatsapp_in: { icon: MessageCircle, color: "text-success bg-success/10" },
+  ligacao: { icon: Phone, color: "text-primary bg-primary/10" },
+  email_out: { icon: Mail, color: "text-muted-foreground bg-muted" },
+  email_in: { icon: Mail, color: "text-muted-foreground bg-muted" },
+  reuniao: { icon: Calendar, color: "text-primary bg-primary/10" },
+  nota: { icon: StickyNote, color: "text-warning bg-warning/10" },
 };
 
 const RESULTADO_COLORS: Record<string, string> = {
@@ -31,6 +38,19 @@ const RESULTADO_COLORS: Record<string, string> = {
   "Sem Resposta": "bg-muted text-muted-foreground border-border",
   "Recusou": "bg-destructive/15 text-destructive border-destructive/30",
   "Pesquisa Concluída": "bg-warning/15 text-warning border-warning/30",
+  sucesso: "bg-success/15 text-success border-success/30",
+  agendado: "bg-primary/15 text-primary border-primary/30",
+  sem_resposta: "bg-muted text-muted-foreground border-border",
+  recusa: "bg-destructive/15 text-destructive border-destructive/30",
+  erro: "bg-destructive/15 text-destructive border-destructive/30",
+};
+
+const ACTIVITY_LABEL: Record<string, string> = {
+  whatsapp_out: "WhatsApp enviado", whatsapp_in: "WhatsApp recebido",
+  ligacao: "Ligação", email_out: "E-mail enviado", email_in: "E-mail recebido",
+  reuniao: "Reunião", nota: "Nota", mudanca_status: "Mudança de status",
+  sucesso: "Sucesso", agendado: "Agendado", sem_resposta: "Sem resposta",
+  recusa: "Recusou", erro: "Erro", escalado: "Escalado",
 };
 
 function formatDayLabel(dateStr: string): string {
@@ -141,9 +161,9 @@ function TimelineItem({
       </div>
       <div className="space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium">{entry.tipo_atividade}</span>
+          <span className="text-sm font-medium">{ACTIVITY_LABEL[entry.tipo_atividade] || entry.tipo_atividade}</span>
           <span className={cn("inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border", resultColor)}>
-            {entry.resultado}
+            {ACTIVITY_LABEL[entry.resultado] || entry.resultado}
           </span>
           <span className="text-[11px] text-muted-foreground ml-auto">
             {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true, locale: ptBR })}

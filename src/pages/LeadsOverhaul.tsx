@@ -39,12 +39,13 @@ import { ptBR } from "date-fns/locale";
 
 const TABS: { value: StatusTab; label: string }[] = [
   { value: "A Contatar", label: "A Contatar" },
-  { value: "Prospectado", label: "Prospectados" },
+  { value: "Em Qualificação", label: "Em Qualificação" },
   { value: "Qualificado", label: "Qualificados" },
   { value: "Reunião Agendada", label: "Reunião Agendada" },
-  { value: "Negociação", label: "Negociação" },
-  { value: "Cliente Ativo", label: "Clientes Ativos" },
-  { value: "Desqualificado", label: "Perdidos" },
+  { value: "Em Negociação", label: "Em Negociação" },
+  { value: "Fechado Ganho", label: "Ganhos" },
+  { value: "Fechado Perdido", label: "Perdidos" },
+  { value: "Nurturing", label: "Nurturing" },
   { value: "all", label: "Todos" },
 ];
 
@@ -496,8 +497,8 @@ export default function LeadsOverhaul() {
                           )}
                         </TableCell>
                         <TableCell className="text-xs">
-                          {lead.responsavel_sdr || lead.sdr_id ? (
-                            <span>{lead.responsavel_sdr || lead.sdr_id}</span>
+                          {lead.responsavel_sdr ? (
+                            <span>{lead.responsavel_sdr}</span>
                           ) : (
                             <span className="text-muted-foreground">sem resp.</span>
                           )}

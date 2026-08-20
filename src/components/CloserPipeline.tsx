@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Lead, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, ESTAGIO_COLORS, Atividade } from "@/types/lead";
-import { getKanbanLeads, updateLead, getLeadAtividades, getLeadsLastContact, LastContactInfo } from "@/store/leads-store";
+import { getKanbanLeads, transitionLeadStage, getLeadAtividades, getLeadsLastContact, LastContactInfo } from "@/store/leads-store";
 import { supabase } from "@/integrations/supabase/client";
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Loader2 } from "lucide-react";
@@ -102,12 +102,11 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
       );
     }
 
-    if (filters.scoreFilter === "high") result = result.filter((l) => (l.lead_score ?? 0) >= 70);
-    else if (filters.scoreFilter === "medium") result = result.filter((l) => (l.lead_score ?? 0) >= 40 && (l.lead_score ?? 0) < 70);
-    else if (filters.scoreFilter === "low") result = result.filter((l) => (l.lead_score ?? 0) < 40);
+    if (filters.scoreFilter === "qualified") result = result.filter((l) => (l.fit_score ?? 0) >= 70);
+    else if (filters.scoreFilter === "below") result = result.filter((l) => l.fit_score !== null && l.fit_score !== undefined && l.fit_score < 70);
+    else if (filters.scoreFilter === "unscored") result = result.filter((l) => l.fit_score === null || l.fit_score === undefined);
 
-    if (filters.sortBy === "score") result.sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0));
-    else if (filters.sortBy === "value") result.sort((a, b) => (b.valor_negocio_estimado ?? 0) - (a.valor_negocio_estimado ?? 0));
+    if (filters.sortBy === "fit") result.sort((a, b) => (b.fit_score ?? -1) - (a.fit_score ?? -1));
 
     return result;
   }, [leads, filters]);
@@ -122,14 +121,24 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
     const lead = leads.find((l) => l.id === leadId);
     if (!lead || lead.estagio_funil === newStage) return;
 
-    setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, estagio_funil: newStage } : l)));
-
     try {
-      await updateLead({ ...lead, estagio_funil: newStage });
+      const updated = await transitionLeadStage(lead, newStage, {
+        eventId: lead.meeting_event_id,
+        meetingAt: lead.data_reuniao_agendada,
+        meetingUrl: lead.reuniao_url,
+        nextStepAt: lead.data_proximo_passo,
+        lossReason: lead.motivo_perda as any,
+        lossReasonDetail: lead.motivo_perda_detalhe,
+        offer: lead.oferta_comercial,
+      });
+      setLeads((prev) => prev.map((l) => (l.id === leadId ? updated : l)));
       toast({ title: "Lead movido", description: `${lead.fantasia || lead.razao_social} → ${newStage}` });
     } catch (err: any) {
-      setLeads((prev) => prev.map((l) => (l.id === leadId ? lead : l)));
-      toast({ title: "Erro ao mover", description: err.message, variant: "destructive" });
+      toast({
+        title: "Movimentação bloqueada pelo playbook V2",
+        description: `${err.message} Abra o card e preencha os campos obrigatórios.`,
+        variant: "destructive",
+      });
     }
   };
 
@@ -146,9 +155,8 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
             {COLUMNS.map((col) => {
               const colLeads = filteredLeads.filter((l) => l.estagio_funil === col);
               const colorClass = ESTAGIO_COLORS[col] || "";
-              const totalValue = colLeads.reduce((sum, l) => sum + (l.valor_negocio_estimado ?? 0), 0);
               return (
-                <PipelineColumn key={col} id={col} colorClass={colorClass} count={colLeads.length} totalValue={totalValue}>
+                <PipelineColumn key={col} id={col} colorClass={colorClass} count={colLeads.length}>
                   {colLeads.map((lead) => {
                     const lc = lastContacts.get(lead.id);
                     return (

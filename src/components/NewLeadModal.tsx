@@ -34,28 +34,30 @@ export function NewLeadModal({ onCreated }: Props) {
     setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleSave = async () => {
+    const cnpj = form.cnpj.replace(/\D/g, "");
+    if (cnpj.length !== 14) {
+      toast({ title: "Campo obrigatório", description: "Informe um CNPJ com 14 dígitos.", variant: "destructive" });
+      return;
+    }
     if (!form.razao_social.trim()) {
       toast({ title: "Campo obrigatório", description: "Razão Social é obrigatória.", variant: "destructive" });
       return;
     }
 
-    // Check for duplicate CNPJ if provided
-    if (form.cnpj.trim()) {
-      const { data: existing } = await supabase
-        .from("leads")
-        .select("id")
-        .eq("cnpj", form.cnpj.trim())
-        .limit(1);
-      if (existing && existing.length > 0) {
-        toast({ title: "CNPJ já cadastrado", description: "Já existe um lead com esse CNPJ.", variant: "destructive" });
-        return;
-      }
+    const { data: existing } = await supabase
+      .from("leads")
+      .select("cnpj")
+      .eq("cnpj", cnpj)
+      .limit(1);
+    if (existing && existing.length > 0) {
+      toast({ title: "CNPJ já cadastrado", description: "Já existe um lead com esse CNPJ.", variant: "destructive" });
+      return;
     }
 
     setSaving(true);
     try {
       const { error } = await supabase.from("leads").insert({
-        cnpj: form.cnpj.trim() || null,
+        cnpj,
         razao_social: form.razao_social.trim(),
         fantasia: form.fantasia.trim() || null,
         cidade: form.cidade.trim().toUpperCase() || null,
@@ -92,7 +94,7 @@ export function NewLeadModal({ onCreated }: Props) {
         </DialogHeader>
         <div className="space-y-4 pt-2">
           <div className="space-y-1.5">
-            <Label htmlFor="cnpj">CNPJ <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+            <Label htmlFor="cnpj">CNPJ <span className="text-destructive">*</span></Label>
             <Input id="cnpj" placeholder="00.000.000/0001-00" value={form.cnpj} onChange={(e) => update("cnpj", e.target.value)} />
           </div>
           <div className="space-y-1.5">

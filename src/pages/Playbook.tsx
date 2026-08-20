@@ -12,6 +12,7 @@ import {
   CATEGORIA_LABEL, ROTEIRO_BLOCOS, NUNCA_ENTRA,
   type Objecao, type ObjecaoStats, type PlaybookConfigItem, type CategoriaObjecao,
 } from "@/store/playbook-store";
+import { PLAYBOOK_VERSION } from "@/types/lead";
 
 // Playbook comercial — matriz de objeções (brief Vinicius) + o que realimenta o
 // passo 4 do framework: frequência, taxa de superação e objeções dos perdidos.
@@ -76,7 +77,8 @@ export default function Playbook() {
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5 text-primary" />
           <h1 className="text-lg font-semibold">Playbook comercial</h1>
-          <span className="text-xs text-muted-foreground">matriz de objeções · roteiro · regras</span>
+          <Badge variant="secondary">{PLAYBOOK_VERSION}</Badge>
+          <span className="text-xs text-muted-foreground">operação de vendas · matriz de objeções · roteiro de 45 min · regras</span>
         </div>
 
         {pendentes.length > 0 && (

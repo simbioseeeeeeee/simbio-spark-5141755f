@@ -1,4 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
+import { PLAYBOOK_VERSION, type OfertaComercial } from "@/types/lead";
+import {
+  calculateExecutionScore,
+  calculateFitScore,
+} from "@/lib/sales-pipeline";
 
 // Playbook comercial — brief Vinicius (14/08).
 // Matriz de objeções, avaliação de reunião com score, prompts de reunião e config
@@ -38,6 +43,8 @@ export type LeadObjecao = {
   objecao_id: string;
   superada: boolean | null;   // null = em aberto
   avaliacao_id: string | null;
+  meeting_event_id: string | null;
+  playbook_version: string;
   contexto: string | null;
   created_at: string;
 };
@@ -80,19 +87,24 @@ export async function listarConfig(): Promise<PlaybookConfigItem[]> {
 
 // ─── objeções do lead ───────────────────────────────────────────────────────
 
-export async function objecoesDoLead(cnpj: string): Promise<LeadObjecao[]> {
-  const { data, error } = await supabase.from("lead_objecoes" as any)
-    .select("*").eq("lead_cnpj", cnpj).order("created_at", { ascending: false });
+export async function objecoesDoLead(cnpj: string, meetingEventId?: string | null): Promise<LeadObjecao[]> {
+  let query = supabase.from("lead_objecoes" as any)
+    .select("*").eq("lead_cnpj", cnpj);
+  if (meetingEventId) query = query.eq("meeting_event_id", meetingEventId);
+  const { data, error } = await query.order("created_at", { ascending: false });
   if (error) throw error;
   return (data as any[]) as LeadObjecao[];
 }
 
-export async function marcarObjecao(cnpj: string, objecaoId: string, createdBy: string,
+export async function marcarObjecao(cnpj: string, meetingEventId: string, objecaoId: string, createdBy: string,
                                     avaliacaoId?: string) {
-  const { error } = await supabase.from("lead_objecoes" as any).insert({
+  if (!meetingEventId.trim()) throw new Error("Registre o event_id da reunião antes de marcar objeções.");
+  const { error } = await supabase.from("lead_objecoes" as any).upsert({
     lead_cnpj: cnpj, objecao_id: objecaoId, created_by: createdBy,
     avaliacao_id: avaliacaoId ?? null,
-  });
+    meeting_event_id: meetingEventId,
+    playbook_version: PLAYBOOK_VERSION,
+  }, { onConflict: "lead_cnpj,meeting_event_id,objecao_id", ignoreDuplicates: true });
   if (error) throw error;
 }
 
@@ -112,7 +124,7 @@ export type FaixaFala = "<40" | "40-60" | "60-80" | ">80";
 export type Desfecho = "fechou" | "proposta_pedida" | "proxima_marcada" | "perdido" | "no_show";
 
 export const DESFECHO_LABEL: Record<Desfecho, string> = {
-  fechou: "Fechou", proposta_pedida: "Proposta pedida",
+  fechou: "Acordo verbal — seguir para proposta", proposta_pedida: "Proposta pedida",
   proxima_marcada: "Próxima reunião marcada", perdido: "Perdido", no_show: "No-show",
 };
 
@@ -130,7 +142,23 @@ export type Avaliacao = {
   desfecho: Desfecho | null;
   proximo_passo_data: string | null;
   obs: string | null;
-  score?: number;
+  motivo_perda?: string | null;
+  motivo_perda_detalhe?: string | null;
+  meeting_event_id: string;
+  playbook_version?: string;
+  fit_icp: number;
+  fit_dor_impacto: number;
+  fit_processo_capacidade: number;
+  fit_decisao: number;
+  fit_timing: number;
+  fit_score?: number;
+  exec_diagnostico: number;
+  exec_escuta: number;
+  exec_confirmacao_entendimento: number;
+  exec_solucao_ligada_dor: number;
+  exec_transparencia_termos: number;
+  exec_proximo_passo: number;
+  execution_score?: number;
   created_at?: string;
 };
 
@@ -143,21 +171,25 @@ export const GATILHOS_AVANCO = [
   "falou de dor com números próprios",
 ];
 
-/** Score 0–100 — a tabela de pesos do brief, aplicada tal qual. */
-export function calcularScore(a: Avaliacao, objecoesCategorias: CategoriaObjecao[]): number {
-  let s = 0;
-  if (a.decisor_presente) s += 20;
-  if (a.duracao_min !== null && a.duracao_min >= 30 && a.duracao_min <= 50) s += 15;
-  if (a.fala_closer_faixa === "<40" || a.fala_closer_faixa === "40-60") s += 15;
-  if (a.preco_apresentado) s += 15;
-  if (a.proximo_passo_data) s += 15;
-  if (a.gatilhos_avanco.length > 0) s += 10;
-  if (!objecoesCategorias.includes("COMPREENSAO")) s += 10;
-  const precoCedoSemTratar = objecoesCategorias.includes("PRECO")
-    && a.preco_minuto !== null && a.preco_minuto < 20 && a.preco_tratado_na_hora === false;
-  if (precoCedoSemTratar) s -= 15;
-  if (a.desconto_sem_contrapartida) s -= 20;
-  return Math.max(0, Math.min(100, s));
+export function calcularScoreFit(a: Avaliacao): number {
+  return calculateFitScore({
+    icp: a.fit_icp,
+    dorImpacto: a.fit_dor_impacto,
+    processoCapacidade: a.fit_processo_capacidade,
+    decisao: a.fit_decisao,
+    timing: a.fit_timing,
+  });
+}
+
+export function calcularScoreExecucao(a: Avaliacao): number {
+  return calculateExecutionScore({
+    diagnostico: a.exec_diagnostico,
+    escuta: a.exec_escuta,
+    confirmacaoEntendimento: a.exec_confirmacao_entendimento,
+    solucaoLigadaDor: a.exec_solucao_ligada_dor,
+    transparenciaTermos: a.exec_transparencia_termos,
+    proximoPassoDatado: a.exec_proximo_passo,
+  });
 }
 
 /** Pontos de melhoria — as frases do brief, direto pro closer. */
@@ -169,28 +201,44 @@ export function pontosDeMelhoria(a: Avaliacao, objecoesCategorias: CategoriaObje
   }
   if (objecoesCategorias.includes("COMPREENSAO"))
     p.push("O cliente não entendeu o que está comprando. Encurte a apresentação e volte para a dor dele.");
-  if (objecoesCategorias.includes("PRECO") && a.preco_minuto !== null
-      && a.preco_minuto < 20 && a.preco_tratado_na_hora === false)
-    p.push(`O preço apareceu no minuto ${a.preco_minuto} e a apresentação continuou. Pare e trate quando isso acontecer.`);
   if (!a.decisor_presente)
-    p.push("Reunião sem decisor. O SDR deve confirmar presença antes de agendar.");
-  if (a.desconto_sem_contrapartida)
-    p.push("Desconto concedido sem troca. Peça prazo, decisão na reunião ou indicação.");
+    p.push("Confirme quem decide e combine a participação dessa pessoa antes de enviar proposta.");
   if (!a.proximo_passo_data && a.desfecho !== "fechou" && a.desfecho !== "perdido")
     p.push("A reunião terminou sem data. 'Vou pensar' sem prazo é objeção não revelada.");
   return p;
 }
 
 export async function salvarAvaliacao(a: Avaliacao): Promise<string> {
-  const { data, error } = await supabase.from("reunioes_avaliacao" as any)
-    .insert({ ...a }).select("id").single();
+  if (!a.meeting_event_id?.trim()) throw new Error("A avaliação exige o event_id da reunião.");
+  if (!a.desfecho) throw new Error("Selecione o desfecho da reunião.");
+  if (a.desfecho !== "perdido" && !a.proximo_passo_data) {
+    throw new Error("O desfecho exige próximo passo com data.");
+  }
+  if (a.desfecho === "perdido" && !a.motivo_perda) throw new Error("Perda exige motivo estruturado.");
+  if (a.desfecho === "perdido" && a.motivo_perda === "outro" && !a.motivo_perda_detalhe?.trim()) {
+    throw new Error("O motivo Outro exige explicação.");
+  }
+  const fitScore = calcularScoreFit(a);
+  const executionScore = calcularScoreExecucao(a);
+  const assessment = {
+    ...a,
+    fit_score: fitScore,
+    execution_score: executionScore,
+    score: executionScore,
+    playbook_version: PLAYBOOK_VERSION,
+  };
+  const { data, error } = await (supabase as any).rpc("save_meeting_assessment_v2", {
+    p_assessment: assessment,
+  });
   if (error) throw error;
-  return (data as any).id as string;
+  return String(data);
 }
 
-export async function avaliacoesDoLead(cnpj: string): Promise<Avaliacao[]> {
-  const { data, error } = await supabase.from("reunioes_avaliacao" as any)
-    .select("*").eq("lead_cnpj", cnpj).order("created_at", { ascending: false });
+export async function avaliacoesDoLead(cnpj: string, meetingEventId?: string | null): Promise<Avaliacao[]> {
+  let query = supabase.from("reunioes_avaliacao" as any)
+    .select("*").eq("lead_cnpj", cnpj);
+  if (meetingEventId) query = query.eq("meeting_event_id", meetingEventId);
+  const { data, error } = await query.order("created_at", { ascending: false });
   if (error) throw error;
   return (data as any[]) as Avaliacao[];
 }
@@ -198,12 +246,14 @@ export async function avaliacoesDoLead(cnpj: string): Promise<Avaliacao[]> {
 // ─── fechamento (Feature C) ─────────────────────────────────────────────────
 
 export type Fechamento = {
-  id: string; lead_cnpj: string; plano: string; valor: number;
-  periodicidade: "mensal" | "trimestral" | "anual";
+  id: string; lead_cnpj: string; plano: string | null; oferta_comercial: OfertaComercial | null; valor: number | null;
+  offer_id: string | null; catalog_version: string | null; quote_id: string | null;
+  quote_snapshot: Record<string, unknown> | null;
+  periodicidade: "unico" | "mensal" | "trimestral" | "anual";
   exclusividade: boolean; exclusividade_cidade: string | null;
   exclusividade_inicio: string | null; exclusividade_fim: string | null;
-  termo_token: string; aceite_em: string | null;
-  asaas_payment_link: string | null; status: string; created_at: string;
+  termo_token: string; aceite_em: string | null; proposta_enviada_em: string | null;
+  asaas_payment_link: string | null; status: string; payment_status: string; pagamento_em: string | null; created_at: string;
 };
 
 export async function fechamentosDoLead(cnpj: string): Promise<Fechamento[]> {
@@ -215,7 +265,60 @@ export async function fechamentosDoLead(cnpj: string): Promise<Fechamento[]> {
 
 export const API_BASE = "https://api.simbiosedigital.com";
 
+export type FechamentoDraft = {
+  ok: true;
+  lead_cnpj: string;
+  meeting_event_id: string | null;
+  dor_impacto: string;
+  objetivo: string;
+  criterios_decisao: string[];
+  oferta_recomendada: OfertaComercial | "";
+  escopo_sugerido: string[];
+  exclusoes: string[];
+  decisor_nome: string;
+  objecoes: string[];
+  proximo_passo: string;
+  missing_evidence: string[];
+  requires_human_review: true;
+  playbook_version: typeof PLAYBOOK_VERSION;
+};
+
+export async function gerarRascunhoFechamento(
+  leadCnpj: string,
+  meetingEventId?: string | null,
+): Promise<FechamentoDraft> {
+  const { data: sess } = await supabase.auth.getSession();
+  const token = sess.session?.access_token;
+  if (!token) throw new Error("sessão expirada — faça login de novo");
+  const response = await fetch(`${API_BASE}/api/fechamento/rascunho`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      lead_cnpj: leadCnpj,
+      ...(meetingEventId ? { meeting_event_id: meetingEventId } : {}),
+    }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body?.detail || body?.error || `HTTP ${response.status}`);
+  if (body?.playbook_version !== PLAYBOOK_VERSION || body?.requires_human_review !== true) {
+    throw new Error("Rascunho incompatível com o playbook comercial atual.");
+  }
+  return body as FechamentoDraft;
+}
+
 export async function criarFechamento(payload: Record<string, unknown>) {
+  if (!payload.offer_id || !payload.quote_id) throw new Error("Calcule a cotação oficial antes de enviar.");
+  if ("valor" in payload || "desconto" in payload) {
+    throw new Error("Preço e desconto não podem ser enviados manualmente.");
+  }
+  const requiredTerms = [
+    "objetivo", "decisor_nome", "proximo_passo",
+  ];
+  const missing = requiredTerms.filter((key) => !String(payload[key] || "").trim());
+  if (missing.length > 0) throw new Error("Revise todos os termos materiais antes de aprovar o envio.");
+  if (payload.proposal_approved !== true || !payload.proposal_approved_by) {
+    throw new Error("A proposta exige aprovação humana identificada.");
+  }
   const { data: sess } = await supabase.auth.getSession();
   const token = sess.session?.access_token;
   if (!token) throw new Error("sessão expirada — faça login de novo");
@@ -243,7 +346,7 @@ export const PROMPTS_REUNIAO: { id: string; quando: "durante" | "final"; titulo:
   { id: "P5", quando: "durante", titulo: "Checagem de decisor",
     texto: "Pelo que foi dito, essa pessoa decide sozinha? Se não, quem mais participa da decisão e o que ela disse sobre isso?" },
   { id: "P6", quando: "final", titulo: "Resumo para o termo de aceite",
-    texto: "Resuma esta reunião em formato de acordo comercial: qual plano foi escolhido, qual valor e periodicidade foram acordados, o que ficou combinado como escopo e quais compromissos eu assumi. Só o que foi dito explicitamente — não complete lacunas." },
+    texto: "Prepare um rascunho para revisão humana: dor e impacto nas palavras do cliente, objetivo, critérios de decisão, oferta recomendada (Imersão, Demanda, Atendimento com IA ou Operação de Vendas), decisor, objeções e próximo passo. Escopo, exclusões e preço vêm somente do catálogo V2.1." },
   { id: "P7", quando: "final", titulo: "Extração de objeções",
     texto: "Liste todas as objeções que o cliente levantou nesta reunião. Para cada uma, traga a frase literal dele, em que momento apareceu, e se foi respondida ou ficou em aberto. Classifique cada uma como: capacidade financeira, falta de compreensão do produto, risco percebido, dependência de decisor, mercado, preço, timing ou concorrência." },
   { id: "P8", quando: "final", titulo: "Autoavaliação (o mais importante)",
@@ -255,13 +358,12 @@ export const PROMPTS_REUNIAO: { id: string; quando: "durante" | "final"; titulo:
 // ─── roteiro (Parte 5, resumo de referência) ────────────────────────────────
 
 export const ROTEIRO_BLOCOS = [
-  { bloco: "Antes (SDR)", min: "", oQue: "Confirmar: nº de corretores · VGV médio mensal · investimento em anúncio · quem decide junto · quando começaria. Sem decisor confirmado, fechamento não é agendado." },
-  { bloco: "1 · Mapa da região", min: "5", oQue: "Dois ou três dados da cidade dele, soltos. Mostrar que a escolha da praça foi deliberada." },
-  { bloco: "2 · Diagnóstico", min: "10", oQue: "Perguntas abertas. ESCUTAR mais do que falar. Anotar a dor com as palavras dele." },
-  { bloco: "3 · Apresentação dirigida", min: "15", oQue: "Só as partes que endereçam a dor do bloco 2. A cada três minutos, uma pergunta." },
-  { bloco: "4 · Prova do tamanho dele", min: "5", oQue: "Um case de perfil equivalente. Nunca autoridade emprestada." },
-  { bloco: "5 · Preço e fechamento", min: "10", oQue: "Conta da folha primeiro, preço depois. CTA único. Se ele disser SIM: encerre (R1)." },
+  { bloco: "1 · Contexto e acordo", min: "5", oQue: "Confirmar objetivo da conversa, participantes, tempo e como a decisão acontece." },
+  { bloco: "2 · Dor, impacto e processo", min: "15", oQue: "Perguntas abertas. Escutar, quantificar impacto e registrar a dor nas palavras do cliente." },
+  { bloco: "3 · Operação atual", min: "8", oQue: "Mapear captação, velocidade de atendimento, acompanhamento do time e gargalos entre lead e venda." },
+  { bloco: "4 · Solução e prova", min: "10", oQue: "Apresentar somente o que responde ao diagnóstico. Case só com fonte e autorização; caso contrário, anonimizar." },
+  { bloco: "5 · Oferta e próximo passo", min: "7", oQue: "Recomendar Imersão, Demanda, Atendimento com IA ou Operação de Vendas, explicar termos materiais e definir o próximo passo com data. Sem decisor, não enviar proposta." },
 ];
 
 export const NUNCA_ENTRA =
-  "Tokenização · licença de cidade · valuation · aporte do grupo · nome/número de cliente sem autorização escrita · objeção que ele não levantou · desconto sem contrapartida · FOMO de meta interna.";
+  "Plano ou preço inventado · claim sem fonte · nome/número de cliente sem autorização · objeção fabricada · falsa urgência · omissão de escopo, custos não incluídos, prazo, periodicidade ou cancelamento.";

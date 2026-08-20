@@ -350,11 +350,17 @@ function DrillDownDialog({ open, onClose, statusFilter, territorio }: { open: bo
     if (!open || !statusFilter) return;
     setLoading(true);
     const loadLeads = async () => {
-      let query = supabase.from("leads").select("*").eq("status_sdr", statusFilter);
+      let query = supabase.from("leads").select("*").eq("status_sdr", "Desqualificado");
+      if (statusFilter === "__other__") {
+        query = query.or('motivo_perda.is.null,motivo_perda.not.in.("sem_fit","investimento","desistencia")');
+      } else {
+        query = query.eq("motivo_perda", statusFilter);
+      }
       if (territorio) query = query.eq("cidade", territorio);
       const { data } = await query.order("created_at", { ascending: false }).limit(100);
       setLeads((data || []).map((r: any) => ({
         ...r,
+        id: r.cnpj,
         fantasia: r.fantasia || "",
         razao_social: r.razao_social || "",
         cnpj: r.cnpj || "",
@@ -367,7 +373,12 @@ function DrillDownDialog({ open, onClose, statusFilter, territorio }: { open: bo
     loadLeads();
   }, [open, statusFilter, territorio]);
 
-  const label = statusFilter.replace("Desqualificado - ", "").replace("Desqualificado", "Geral");
+  const label = ({
+    sem_fit: "Sem fit",
+    investimento: "Investimento",
+    desistencia: "Desistência",
+    __other__: "Demais motivos",
+  } as Record<string, string>)[statusFilter] || statusFilter;
 
   return (
     <>
@@ -391,7 +402,7 @@ function DrillDownDialog({ open, onClose, statusFilter, territorio }: { open: bo
                   <TableHead>CNPJ</TableHead>
                   <TableHead>Cidade</TableHead>
                   <TableHead>Bairro</TableHead>
-                  <TableHead className="text-center">Score</TableHead>
+                  <TableHead className="text-center">Pesquisa digital</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -402,7 +413,7 @@ function DrillDownDialog({ open, onClose, statusFilter, territorio }: { open: bo
                     <TableCell className="text-muted-foreground text-sm">{lead.cidade}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{lead.bairro}</TableCell>
                     <TableCell className="text-center">
-                      {lead.lead_score !== null ? <span className="font-bold text-sm">{lead.lead_score}</span> : <span className="text-muted-foreground">—</span>}
+                      {lead.lead_score !== null ? <span className="font-bold text-sm">{lead.lead_score}/100</span> : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -510,11 +521,11 @@ function AnalyticsView({ territorio, onTerritorio }: { territorio: string; onTer
         (payload) => {
           const newLead = payload.new as any;
           const oldLead = payload.old as any;
-          const wasNotDisqualified = !oldLead?.status_sdr?.startsWith('Desqualificado');
-          const isNowDisqualified = newLead?.status_sdr?.startsWith('Desqualificado');
+          const wasNotDisqualified = oldLead?.status_sdr !== 'Desqualificado';
+          const isNowDisqualified = newLead?.status_sdr === 'Desqualificado';
           if (wasNotDisqualified && isNowDisqualified) {
             const nome = newLead.fantasia || newLead.razao_social || 'Lead';
-            const motivo = newLead.status_sdr.replace('Desqualificado - ', '').replace('Desqualificado', 'Geral');
+            const motivo = newLead.motivo_perda || 'sem motivo registrado';
             toast({
               title: "⚠️ Lead Desqualificado",
               description: `${nome} (${newLead.cidade || '—'}) — Motivo: ${motivo}`,
@@ -643,7 +654,7 @@ function AnalyticsView({ territorio, onTerritorio }: { territorio: string; onTer
               }} />
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-              <KpiCard label="Leads Qualificados" value={Number(analytics.total_leads_qualificados)} icon={Users} color="bg-primary/10 text-primary" target={t.leads} />
+              <KpiCard label="Leads com Fit ≥ 70" value={Number(analytics.total_leads_qualificados)} icon={Users} color="bg-primary/10 text-primary" target={t.leads} />
               {/* KPI do doc Fase 1: realizadas vs agendadas (no-show). Substitui "Atividades". */}
               <KpiCard
                 label="No-show"
@@ -663,10 +674,10 @@ function AnalyticsView({ territorio, onTerritorio }: { territorio: string; onTer
                 {Number(analytics.total_desqualificados) > 0 && (
                   <div className="space-y-1 pt-1">
                     {[
-                      { label: "Sem Perfil", value: analytics.desq_sem_perfil, filter: "Desqualificado - Sem Perfil" },
-                      { label: "Sem Budget", value: analytics.desq_sem_budget, filter: "Desqualificado - Sem Budget" },
-                      { label: "Sem Interesse", value: analytics.desq_sem_interesse, filter: "Desqualificado - Sem Interesse" },
-                      { label: "Geral", value: analytics.desq_geral, filter: "Desqualificado" },
+                      { label: "Sem fit", value: analytics.desq_sem_perfil, filter: "sem_fit" },
+                      { label: "Investimento", value: analytics.desq_sem_budget, filter: "investimento" },
+                      { label: "Desistência", value: analytics.desq_sem_interesse, filter: "desistencia" },
+                      { label: "Demais motivos", value: analytics.desq_geral, filter: "__other__" },
                     ].filter(i => i.value > 0).map((item) => (
                       <div
                         key={item.label}
@@ -984,34 +995,43 @@ function AnalyticsView({ territorio, onTerritorio }: { territorio: string; onTer
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground mb-3">
-              Estes leads possuem status "Reunião Agendada" mas nenhuma atividade "Agendou Reunião" foi registrada. A métrica de reuniões não os contabiliza.
+              Estes leads possuem status "Reunião Agendada" mas não têm o registro canônico da atividade de agendamento. A métrica de reuniões não os contabiliza.
+              A evidência abaixo é somente leitura e vem do Calendar/Meet.
             </p>
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead>Lead</TableHead>
                   <TableHead>Cidade</TableHead>
+                  <TableHead>Agenda confirmada</TableHead>
                   <TableHead>Criado em</TableHead>
                   <TableHead className="w-[120px] text-right">Ação</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {inconsistencies.map((inc) => (
-                  <TableRow key={inc.id}>
+                  <TableRow key={inc.cnpj}>
                     <TableCell className="font-medium">{inc.fantasia || inc.razao_social || "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{inc.cidade || "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      <div>{inc.data_reuniao_agendada ? new Date(inc.data_reuniao_agendada).toLocaleString("pt-BR") : "sem data"}</div>
+                      <div className="max-w-[180px] truncate" title={inc.meeting_event_id || undefined}>
+                        {inc.meeting_event_id || "sem event_id"}
+                      </div>
+                      {inc.reuniao_url && <a className="text-primary underline" href={inc.reuniao_url} target="_blank" rel="noreferrer">abrir link</a>}
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{new Date(inc.created_at).toLocaleDateString("pt-BR")}</TableCell>
                     <TableCell className="text-right">
                       <Button
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs gap-1"
-                        disabled={fixingId === inc.id}
+                        disabled={fixingId === inc.cnpj || !inc.meeting_event_id || !inc.data_reuniao_agendada || !inc.reuniao_url}
                         onClick={async () => {
-                          setFixingId(inc.id);
+                          setFixingId(inc.cnpj);
                           try {
-                            await registrarReuniaoAgendada({ id: inc.id, sdr_id: null, owner_id: null }, user?.id);
-                            setInconsistencies((prev) => prev.filter((i) => i.id !== inc.id));
+                            await registrarReuniaoAgendada({ id: inc.cnpj, cnpj: inc.cnpj }, user?.id);
+                            setInconsistencies((prev) => prev.filter((i) => i.cnpj !== inc.cnpj));
                             toast({ title: "✅ Corrigido", description: `Reunião contabilizada para ${inc.fantasia || inc.razao_social}.` });
                             loadData();
                           } catch (err: any) {
@@ -1021,7 +1041,7 @@ function AnalyticsView({ territorio, onTerritorio }: { territorio: string; onTer
                           }
                         }}
                       >
-                        {fixingId === inc.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                        {fixingId === inc.cnpj ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
                         Corrigir
                       </Button>
                     </TableCell>
@@ -1098,7 +1118,6 @@ export default function ManagerWorkspace() {
 }
 
 // Simplified cadencia view for Manager
-import { CADENCE_STEPS } from "@/types/lead";
 import { ActivityModal } from "@/components/ActivityModal";
 
 import { Crosshair, Search, Phone, MessageSquare, Bot } from "lucide-react";
@@ -1182,7 +1201,6 @@ function SdrCadenciaForManager() {
       ) : (
         <div className="space-y-2">
           {filteredCadencia.map((lead) => {
-            const step = CADENCE_STEPS[lead.dia_cadencia] || `Passo ${lead.dia_cadencia + 1}`;
             const isOverdue = lead.data_proximo_passo && new Date(lead.data_proximo_passo) < new Date();
             return (
               <div key={lead.id} className="rounded-lg border border-border bg-card p-3 flex items-center gap-3 hover:border-primary/30 transition-colors">
@@ -1193,7 +1211,9 @@ function SdrCadenciaForManager() {
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className={`text-xs font-medium ${isOverdue ? 'text-destructive' : 'text-primary'}`}>
-                      Dia {lead.dia_cadencia}: {step}
+                      {lead.data_proximo_passo
+                        ? `Próximo passo: ${new Date(lead.data_proximo_passo).toLocaleString("pt-BR")}`
+                        : "Próximo passo a definir"}
                     </span>
                     {isOverdue && <span className="text-xs text-destructive">(Atrasado)</span>}
                     <span className="text-xs text-muted-foreground">· {lead.cidade}</span>
@@ -1211,4 +1231,3 @@ function SdrCadenciaForManager() {
     </>
   );
 }
-

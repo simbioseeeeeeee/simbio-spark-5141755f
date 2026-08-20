@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Envs locais — NUNCA commitar (podem conter chaves)
+.env.local
+.env.*.local

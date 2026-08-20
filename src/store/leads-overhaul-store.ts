@@ -56,24 +56,20 @@ function rowToLead(row: any): Lead {
     whatsapp_humano: row.whatsapp_humano ?? false,
     observacoes_sdr: row.observacoes_sdr || "",
     estagio_funil: row.estagio_funil || null,
-    valor_negocio_estimado: row.valor_negocio_estimado ?? null,
     data_proximo_passo: row.data_proximo_passo || null,
     observacoes_closer: row.observacoes_closer || "",
     pesquisa_realizada: row.pesquisa_realizada ?? false,
     lead_score: row.lead_score ?? null,
-    dia_cadencia: row.dia_cadencia ?? 0,
     status_cadencia: row.status_cadencia || "ativo",
     created_at: row.created_at,
     updated_at: row.updated_at ?? null,
     origem_lead: row.origem_lead ?? null,
     tipo_lead: row.tipo_lead ?? null,
-    owner_id: row.owner_id || row.responsavel_closer || null,
-    sdr_id: row.sdr_id || row.responsavel_sdr || null,
-    canal_preferido: row.canal_preferido || "nao_definido",
     // Campos nativos do mdew
     responsavel_sdr: row.responsavel_sdr || null,
     responsavel_closer: row.responsavel_closer || null,
     motivo_perda: row.motivo_perda || null,
+    stage_changed_at: row.stage_changed_at || null,
     tentativas_followup: row.tentativas_followup ?? null,
     data_ultimo_contato: row.data_ultimo_contato || null,
     qtde_funcionarios: row.qtde_funcionarios ?? null,
@@ -87,11 +83,14 @@ function rowToLead(row: any): Lead {
 export type StatusTab =
   | "all"
   | "A Contatar"
-  | "Prospectado"
+  | "Em Qualificação"
   | "Qualificado"
   | "Reunião Agendada"
-  | "Negociação"
-  | "Cliente Ativo"
+  | "Em Negociação"
+  | "Fechado Ganho"
+  | "Fechado Perdido"
+  | "Nurturing"
+  | "Opt-out"
   | "Desqualificado";
 
 export interface OverhaulQuery {
@@ -116,17 +115,14 @@ export interface OverhaulResult {
 }
 
 function applyCommonFilters(query: any, q: OverhaulQuery) {
-  // Tab by status_sdr — mdew usa: A Contatar, Prospectado, Qualificado,
-  // Reunião Agendada, Cliente Ativo, Desqualificado. "Negociação" só existe em estagio_funil.
+  // Tabs usam apenas o vocabulário canônico do playbook V2.
   if (q.tab !== "all") {
     if (q.tab === "Desqualificado") {
-      query = query.like("status_sdr", "Desqualificado%");
-    } else if (q.tab === "Negociação") {
-      // não tem status_sdr — filtra por estagio_funil (aceita ambas variantes)
-      query = query.in("estagio_funil", ["Negociação", "Em Negociação", "Proposta Enviada", "Reunião Realizada"]);
-    } else if (q.tab === "Cliente Ativo") {
-      // casa status_sdr OU estagio_funil=Fechado Ganho
-      query = query.or("status_sdr.eq.Cliente Ativo,estagio_funil.eq.Fechado Ganho");
+      query = query.eq("status_sdr", "Desqualificado");
+    } else if (q.tab === "Em Negociação") {
+      query = query.in("estagio_funil", ["Diagnóstico Realizado", "Proposta Enviada", "Em Negociação", "Aguardando Aceite", "Aguardando Pagamento"]);
+    } else if (q.tab === "Fechado Ganho" || q.tab === "Fechado Perdido") {
+      query = query.eq("estagio_funil", q.tab);
     } else {
       query = query.eq("status_sdr", q.tab);
     }
@@ -211,9 +207,13 @@ export async function getTabCounts(
     "all",
     "A Contatar",
     "Em Qualificação",
+    "Qualificado",
     "Reunião Agendada",
-    "Negociação",
-    "Cliente Ativo",
+    "Em Negociação",
+    "Fechado Ganho",
+    "Fechado Perdido",
+    "Nurturing",
+    "Opt-out",
     "Desqualificado",
   ];
 
@@ -245,28 +245,16 @@ export async function getLeadByCnpj(cnpj: string): Promise<Lead | null> {
   return data ? rowToLead(data) : null;
 }
 
-/** Lead por id/cnpj — mdew usa cnpj como PK. Tenta cnpj primeiro. */
+/** Lead por CNPJ; o parâmetro preserva o nome antigo por compatibilidade da UI. */
 export async function getLeadById(idOrCnpj: string): Promise<Lead | null> {
   if (!idOrCnpj) return null;
-  // cnpj (PK no mdew)
   const byCnpj = await supabase
     .from("leads")
     .select("*")
     .eq("cnpj", idOrCnpj)
     .maybeSingle();
-  if (byCnpj.data) return rowToLead(byCnpj.data);
-  // fallback: id UUID (schema simbio-spark antigo)
-  try {
-    const byId = await supabase
-      .from("leads")
-      .select("*")
-      .eq("id", idOrCnpj)
-      .maybeSingle();
-    if (byId.data) return rowToLead(byId.data);
-  } catch {
-    // col id não existe no mdew — ignora
-  }
-  return null;
+  if (byCnpj.error) throw byCnpj.error;
+  return byCnpj.data ? rowToLead(byCnpj.data) : null;
 }
 
 /** Valores distintos de responsável — lê direto da tabela leads (mdew não tem user_roles) */
@@ -325,14 +313,17 @@ export async function getStatusDistribution(hideAcelerador = true): Promise<
   const statuses = [
     "A Contatar",
     "Em Qualificação",
+    "Qualificado",
     "Reunião Agendada",
+    "Nurturing",
+    "Opt-out",
     "Desqualificado",
   ];
   const results = await Promise.all(
     statuses.map(async (s) => {
       let q = supabase.from("leads").select("*", { count: "exact", head: true });
       if (s === "Desqualificado") {
-        q = q.like("status_sdr", "Desqualificado%");
+        q = q.eq("status_sdr", "Desqualificado");
       } else {
         q = q.eq("status_sdr", s);
       }
@@ -356,11 +347,12 @@ export interface DashboardMetrics {
 }
 
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
-  // ativos = não-perdidos, não-acelerador
+  // Ativos excluem saídas e terminais do playbook V2.
   const { count: ativos } = await supabase
     .from("leads")
     .select("*", { count: "exact", head: true })
-    .not("status_sdr", "like", "Desqualificado%")
+    .not("status_sdr", "in", '("Nurturing","Desqualificado","Opt-out")')
+    .or('estagio_funil.is.null,estagio_funil.not.in.("Nurturing","Desqualificado","Opt-out","Fechado Perdido","Fechado Ganho")')
     .or("tipo_lead.neq.programa_acelerador,tipo_lead.is.null");
 
   // novos 7d
@@ -387,11 +379,12 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const totalFunil = (aContatar ?? 0) + (reuniao ?? 0);
   const taxa = totalFunil > 0 ? ((reuniao ?? 0) / totalFunil) * 100 : 0;
 
-  // prontos closer = estagio_funil not null
+  // Pipeline em curso, sem saídas e terminais.
   const { count: prontos } = await supabase
     .from("leads")
     .select("*", { count: "exact", head: true })
-    .not("estagio_funil", "is", null);
+    .not("estagio_funil", "is", null)
+    .not("estagio_funil", "in", '("Nurturing","Desqualificado","Opt-out","Fechado Perdido","Fechado Ganho")');
 
   return {
     leads_ativos: ativos ?? 0,

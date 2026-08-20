@@ -6,6 +6,113 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
+// Snapshot da tabela `leads` exposta pelo projeto Supabase em produção.
+// A chave é `cnpj` (text); as colunas UUID `id`, `owner_id` e `sdr_id` nunca
+// existiram nesse projeto. Manter esse contrato aqui evita que novas escritas
+// aparentemente tipadas voltem a usar o schema do protótipo antigo.
+export type LeadDatabaseRow = {
+  bairro: string | null
+  celular1: string | null
+  celular2: string | null
+  cep: string | null
+  cidade: string | null
+  cnae: string | null
+  cnae_descricao: string | null
+  cnae_grupo: string | null
+  cnae_setor: string | null
+  cnpj: string
+  complemento: string | null
+  contato_nome: string | null
+  created_at: string
+  data_abertura: string | null
+  data_proximo_passo: string | null
+  data_reuniao_agendada: string | null
+  data_ultimo_contato: string | null
+  decisor_confirmado: boolean
+  email1: string | null
+  email2: string | null
+  estagio_funil: string | null
+  execution_score: number | null
+  fantasia: string | null
+  faz_anuncios: boolean
+  fit_score: number | null
+  fit_score_breakdown: Json
+  ganho_override_em: string | null
+  ganho_override_motivo: string | null
+  ganho_override_por: string | null
+  ig_handle: string | null
+  ig_seguidores: number | null
+  instagram_ativo: boolean
+  lead_score: number | null
+  legacy_estagio_funil: string | null
+  legacy_status_sdr: string | null
+  logradouro: string | null
+  lp_origem: string | null
+  meeting_event_id: string | null
+  motivo_perda: string | null
+  motivo_perda_detalhe: string | null
+  no_show_reagenda_tentativas: number
+  numero: string | null
+  observacoes_closer: string | null
+  observacoes_sdr: string | null
+  oferta_comercial: string | null
+  origem_lead: string | null
+  pagamento_em: string | null
+  payment_status: string
+  pesquisa_realizada: boolean
+  pipeline_review_required: boolean
+  playbook_version: string
+  porte_equipe: string | null
+  possui_site: boolean
+  proposta_enviada_em: string | null
+  qtde_funcionarios: number | null
+  razao_social: string | null
+  responsavel_closer: string | null
+  responsavel_sdr: string | null
+  reuniao_url: string | null
+  setor_publico: boolean | null
+  situacao: string | null
+  stage_changed_at: string | null
+  status_cadencia: string
+  status_sdr: string
+  telefone1: string | null
+  telefone2: string | null
+  tentativas_followup: number | null
+  tipo_empresa: string | null
+  tipo_lead: string | null
+  tipo_logradouro: string | null
+  uf: string | null
+  updated_at: string | null
+  url_instagram: string | null
+  url_site: string | null
+  whatsapp_automacao: boolean
+  whatsapp_humano: boolean
+  aceite_em: string | null
+  [key: `socio${number}_${string}`]: string | null
+}
+
+export type LeadDatabaseInsert = Partial<LeadDatabaseRow> & { cnpj: string }
+
+type ServerControlledLeadField =
+  | "aceite_em"
+  | "data_reuniao_agendada"
+  | "decisor_confirmado"
+  | "execution_score"
+  | "fit_score"
+  | "fit_score_breakdown"
+  | "ganho_override_em"
+  | "ganho_override_motivo"
+  | "ganho_override_por"
+  | "meeting_event_id"
+  | "no_show_reagenda_tentativas"
+  | "pagamento_em"
+  | "payment_status"
+  | "proposta_enviada_em"
+  | "reuniao_url"
+  | "stage_changed_at"
+
+export type LeadDatabaseUpdate = Partial<Omit<LeadDatabaseRow, "cnpj" | ServerControlledLeadField>>
+
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -16,62 +123,63 @@ export type Database = {
     Tables: {
       atividades: {
         Row: {
+          call_id: string | null
+          canal: string | null
           created_at: string
-          de_numero: string | null
+          created_by: string | null
+          direcao: string | null
           duracao_segundos: number | null
+          gravacao_url: string | null
           id: string
-          lead_id: string
+          lead_cnpj: string
+          message_key: string | null
+          metadados: Json
           nota: string | null
-          owner_id: string | null
-          para_numero: string | null
-          resultado: string
-          sdr_id: string | null
-          sentimento: string | null
+          origem: string | null
+          playbook_version: string
+          resultado: string | null
+          status_vapi: string | null
           tipo_atividade: string
-          transcricao: string | null
-          url_gravacao: string | null
         }
         Insert: {
+          call_id?: string | null
+          canal?: string | null
           created_at?: string
-          de_numero?: string | null
+          created_by?: string | null
+          direcao?: string | null
           duracao_segundos?: number | null
+          gravacao_url?: string | null
           id?: string
-          lead_id: string
+          lead_cnpj: string
+          message_key?: string | null
+          metadados?: Json
           nota?: string | null
-          owner_id?: string | null
-          para_numero?: string | null
-          resultado: string
-          sdr_id?: string | null
-          sentimento?: string | null
+          origem?: string | null
+          playbook_version?: string
+          resultado?: string | null
+          status_vapi?: string | null
           tipo_atividade: string
-          transcricao?: string | null
-          url_gravacao?: string | null
         }
         Update: {
+          call_id?: string | null
+          canal?: string | null
           created_at?: string
-          de_numero?: string | null
+          created_by?: string | null
+          direcao?: string | null
           duracao_segundos?: number | null
+          gravacao_url?: string | null
           id?: string
-          lead_id?: string
+          lead_cnpj?: string
+          message_key?: string | null
+          metadados?: Json
           nota?: string | null
-          owner_id?: string | null
-          para_numero?: string | null
-          resultado?: string
-          sdr_id?: string | null
-          sentimento?: string | null
+          origem?: string | null
+          playbook_version?: string
+          resultado?: string | null
+          status_vapi?: string | null
           tipo_atividade?: string
-          transcricao?: string | null
-          url_gravacao?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "atividades_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "leads"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       kpi_daily_snapshots: {
         Row: {
@@ -110,147 +218,9 @@ export type Database = {
         Relationships: []
       }
       leads: {
-        Row: {
-          bairro: string | null
-          canal_preferido: string
-          celular1: string | null
-          celular2: string | null
-          cep: string | null
-          cidade: string | null
-          cnae_descricao: string | null
-          cnpj: string | null
-          complemento: string | null
-          created_at: string
-          data_abertura: string | null
-          data_proximo_passo: string | null
-          dia_cadencia: number
-          email1: string | null
-          email2: string | null
-          estagio_funil: string | null
-          fantasia: string | null
-          faz_anuncios: boolean
-          id: string
-          instagram_ativo: boolean
-          lead_score: number | null
-          logradouro: string | null
-          numero: string | null
-          observacoes_closer: string | null
-          observacoes_sdr: string | null
-          origem_lead: string | null
-          owner_id: string | null
-          pesquisa_realizada: boolean
-          possui_site: boolean
-          razao_social: string | null
-          sdr_id: string | null
-          situacao: string | null
-          socios: Json | null
-          status_cadencia: string
-          status_sdr: string
-          telefone1: string | null
-          telefone2: string | null
-          tipo_lead: string | null
-          uf: string | null
-          updated_at: string | null
-          url_instagram: string | null
-          url_site: string | null
-          valor_negocio_estimado: number | null
-          whatsapp_automacao: boolean
-          whatsapp_humano: boolean
-        }
-        Insert: {
-          bairro?: string | null
-          canal_preferido?: string
-          celular1?: string | null
-          celular2?: string | null
-          cep?: string | null
-          cidade?: string | null
-          cnae_descricao?: string | null
-          cnpj?: string | null
-          complemento?: string | null
-          created_at?: string
-          data_abertura?: string | null
-          data_proximo_passo?: string | null
-          dia_cadencia?: number
-          email1?: string | null
-          email2?: string | null
-          estagio_funil?: string | null
-          fantasia?: string | null
-          faz_anuncios?: boolean
-          id?: string
-          instagram_ativo?: boolean
-          lead_score?: number | null
-          logradouro?: string | null
-          numero?: string | null
-          observacoes_closer?: string | null
-          observacoes_sdr?: string | null
-          origem_lead?: string | null
-          owner_id?: string | null
-          pesquisa_realizada?: boolean
-          possui_site?: boolean
-          razao_social?: string | null
-          sdr_id?: string | null
-          situacao?: string | null
-          socios?: Json | null
-          status_cadencia?: string
-          status_sdr?: string
-          telefone1?: string | null
-          telefone2?: string | null
-          tipo_lead?: string | null
-          uf?: string | null
-          updated_at?: string | null
-          url_instagram?: string | null
-          url_site?: string | null
-          valor_negocio_estimado?: number | null
-          whatsapp_automacao?: boolean
-          whatsapp_humano?: boolean
-        }
-        Update: {
-          bairro?: string | null
-          canal_preferido?: string
-          celular1?: string | null
-          celular2?: string | null
-          cep?: string | null
-          cidade?: string | null
-          cnae_descricao?: string | null
-          cnpj?: string | null
-          complemento?: string | null
-          created_at?: string
-          data_abertura?: string | null
-          data_proximo_passo?: string | null
-          dia_cadencia?: number
-          email1?: string | null
-          email2?: string | null
-          estagio_funil?: string | null
-          fantasia?: string | null
-          faz_anuncios?: boolean
-          id?: string
-          instagram_ativo?: boolean
-          lead_score?: number | null
-          logradouro?: string | null
-          numero?: string | null
-          observacoes_closer?: string | null
-          observacoes_sdr?: string | null
-          origem_lead?: string | null
-          owner_id?: string | null
-          pesquisa_realizada?: boolean
-          possui_site?: boolean
-          razao_social?: string | null
-          sdr_id?: string | null
-          situacao?: string | null
-          socios?: Json | null
-          status_cadencia?: string
-          status_sdr?: string
-          telefone1?: string | null
-          telefone2?: string | null
-          tipo_lead?: string | null
-          uf?: string | null
-          updated_at?: string | null
-          url_instagram?: string | null
-          url_site?: string | null
-          valor_negocio_estimado?: number | null
-          whatsapp_automacao?: boolean
-          whatsapp_humano?: boolean
-        }
+        Row: LeadDatabaseRow
+        Insert: LeadDatabaseInsert
+        Update: LeadDatabaseUpdate
         Relationships: []
       }
       manager_targets: {
@@ -350,50 +320,7 @@ export type Database = {
       }
       get_cadencia_amanha: {
         Args: { p_cidade?: string }
-        Returns: {
-          bairro: string | null
-          canal_preferido: string
-          celular1: string | null
-          celular2: string | null
-          cep: string | null
-          cidade: string | null
-          cnae_descricao: string | null
-          cnpj: string | null
-          complemento: string | null
-          created_at: string
-          data_abertura: string | null
-          data_proximo_passo: string | null
-          dia_cadencia: number
-          email1: string | null
-          email2: string | null
-          estagio_funil: string | null
-          fantasia: string | null
-          faz_anuncios: boolean
-          id: string
-          instagram_ativo: boolean
-          lead_score: number | null
-          logradouro: string | null
-          numero: string | null
-          observacoes_closer: string | null
-          observacoes_sdr: string | null
-          owner_id: string | null
-          pesquisa_realizada: boolean
-          possui_site: boolean
-          razao_social: string | null
-          sdr_id: string | null
-          situacao: string | null
-          socios: Json | null
-          status_cadencia: string
-          status_sdr: string
-          telefone1: string | null
-          telefone2: string | null
-          uf: string | null
-          url_instagram: string | null
-          url_site: string | null
-          valor_negocio_estimado: number | null
-          whatsapp_automacao: boolean
-          whatsapp_humano: boolean
-        }[]
+        Returns: LeadDatabaseRow[]
         SetofOptions: {
           from: "*"
           to: "leads"
@@ -403,50 +330,7 @@ export type Database = {
       }
       get_cadencia_concluidas_hoje: {
         Args: { p_cidade?: string }
-        Returns: {
-          bairro: string | null
-          canal_preferido: string
-          celular1: string | null
-          celular2: string | null
-          cep: string | null
-          cidade: string | null
-          cnae_descricao: string | null
-          cnpj: string | null
-          complemento: string | null
-          created_at: string
-          data_abertura: string | null
-          data_proximo_passo: string | null
-          dia_cadencia: number
-          email1: string | null
-          email2: string | null
-          estagio_funil: string | null
-          fantasia: string | null
-          faz_anuncios: boolean
-          id: string
-          instagram_ativo: boolean
-          lead_score: number | null
-          logradouro: string | null
-          numero: string | null
-          observacoes_closer: string | null
-          observacoes_sdr: string | null
-          owner_id: string | null
-          pesquisa_realizada: boolean
-          possui_site: boolean
-          razao_social: string | null
-          sdr_id: string | null
-          situacao: string | null
-          socios: Json | null
-          status_cadencia: string
-          status_sdr: string
-          telefone1: string | null
-          telefone2: string | null
-          uf: string | null
-          url_instagram: string | null
-          url_site: string | null
-          valor_negocio_estimado: number | null
-          whatsapp_automacao: boolean
-          whatsapp_humano: boolean
-        }[]
+        Returns: LeadDatabaseRow[]
         SetofOptions: {
           from: "*"
           to: "leads"
@@ -456,50 +340,7 @@ export type Database = {
       }
       get_cadencia_hoje: {
         Args: { p_cidade?: string }
-        Returns: {
-          bairro: string | null
-          canal_preferido: string
-          celular1: string | null
-          celular2: string | null
-          cep: string | null
-          cidade: string | null
-          cnae_descricao: string | null
-          cnpj: string | null
-          complemento: string | null
-          created_at: string
-          data_abertura: string | null
-          data_proximo_passo: string | null
-          dia_cadencia: number
-          email1: string | null
-          email2: string | null
-          estagio_funil: string | null
-          fantasia: string | null
-          faz_anuncios: boolean
-          id: string
-          instagram_ativo: boolean
-          lead_score: number | null
-          logradouro: string | null
-          numero: string | null
-          observacoes_closer: string | null
-          observacoes_sdr: string | null
-          owner_id: string | null
-          pesquisa_realizada: boolean
-          possui_site: boolean
-          razao_social: string | null
-          sdr_id: string | null
-          situacao: string | null
-          socios: Json | null
-          status_cadencia: string
-          status_sdr: string
-          telefone1: string | null
-          telefone2: string | null
-          uf: string | null
-          url_instagram: string | null
-          url_site: string | null
-          valor_negocio_estimado: number | null
-          whatsapp_automacao: boolean
-          whatsapp_humano: boolean
-        }[]
+        Returns: LeadDatabaseRow[]
         SetofOptions: {
           from: "*"
           to: "leads"
@@ -710,11 +551,14 @@ export type Database = {
       get_reuniao_inconsistencies: {
         Args: { p_cidade?: string }
         Returns: {
-          cidade: string
+          cidade: string | null
+          cnpj: string
           created_at: string
-          fantasia: string
-          id: string
-          razao_social: string
+          data_reuniao_agendada: string | null
+          fantasia: string | null
+          meeting_event_id: string | null
+          razao_social: string | null
+          reuniao_url: string | null
         }[]
       }
       get_sdr_performance: {

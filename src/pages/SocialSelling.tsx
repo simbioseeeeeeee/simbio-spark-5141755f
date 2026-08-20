@@ -162,8 +162,27 @@ export default function SocialSelling() {
     const coluna = CARIMBO[campo];
     if (coluna) patch[coluna] = valor ? agora : null;
     setAlvos((prev) => prev.map((x) => (x.cnpj === a.cnpj ? { ...x, ...patch } as Alvo : x)));
-    await supabase.from("social_selling_alvos" as any).update(patch).eq("cnpj", a.cnpj);
-    if (campo === "dm_enviada") { contaHoje(); carregaMapa(); }
+    // `.select("cnpj")` para SABER se casou: o PostgREST devolve 204 mesmo quando o
+    // UPDATE não atinge linha nenhuma, então sem isso uma falha era indistinguível
+    // de sucesso — a tela marcava, o banco não, e no reload voltava pendente
+    // (a pessoa clicava de novo, e isso realimentava a fila).
+    const { data: casou, error } = await supabase
+      .from("social_selling_alvos" as any)
+      .update(patch)
+      .eq("cnpj", a.cnpj)
+      .select("cnpj");
+    if (error || !casou?.length) {
+      // desfaz a marcação otimista — melhor a pessoa ver que não salvou
+      setAlvos((prev) => prev.map((x) => (x.cnpj === a.cnpj ? a : x)));
+      setSalvando(null);
+      return;
+    }
+    // Contador do dia é ajustado LOCALMENTE. Antes cada DM disparava um HEAD de
+    // contagem + uma recarga do mapa (1 query por praça ativa, hoje 4) sem await —
+    // 1 clique virava 6 requisições concorrentes. Com uma pessoa varrendo 300
+    // alvos, é isso que satura o pool. O mapa recarrega quando a pessoa troca de
+    // cidade ou recarrega a página.
+    if (campo === "dm_enviada") setFeitasHoje((n) => n + (valor ? 1 : -1));
     setSalvando(null);
   }
 

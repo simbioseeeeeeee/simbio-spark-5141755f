@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { calculateScore } from "@/types/lead";
+import { calculateScore, PLAYBOOK_VERSION } from "@/types/lead";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -110,7 +110,7 @@ export function BatchResearch({ cidade, onComplete }: Props) {
             lead_score: score,
             pesquisa_realizada: true,
           })
-          .eq("id", lead.id);
+          .eq("cnpj", lead.cnpj || lead.id);
 
         if (updErr) {
           console.warn(`[BatchResearch] Erro ao atualizar lead "${name}":`, updErr.message);
@@ -119,14 +119,24 @@ export function BatchResearch({ cidade, onComplete }: Props) {
           continue;
         }
 
-        // Insert research activity with sdr_id
+        // O schema vivo usa lead_cnpj/created_by e enums minúsculos.
         const { error: actErr } = await supabase.from("atividades").insert({
-          lead_id: lead.id,
-          tipo_atividade: "Pesquisa",
-          resultado: "Pesquisa Concluída",
+          lead_cnpj: lead.cnpj || lead.id,
+          tipo_atividade: "nota",
+          resultado: "sucesso",
           nota: `Pesquisa IA em lote — Score: ${score}`,
-          sdr_id: userId || null,
-        });
+          created_by: userId || "crm",
+          direcao: "out",
+          canal: "pesquisa",
+          origem: lead.origem_lead || "crm_manual",
+          playbook_version: PLAYBOOK_VERSION,
+          metadados: {
+            event: "research_completed",
+            ui_tipo: "Pesquisa",
+            ui_resultado: "Pesquisa Concluída",
+            lead_score: score,
+          },
+        } as any);
         if (actErr) {
           console.warn(`[BatchResearch] Erro ao inserir atividade para "${name}":`, actErr.message);
         }

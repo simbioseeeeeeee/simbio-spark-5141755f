@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Lead, CADENCE_STEPS } from "@/types/lead";
+import { Lead } from "@/types/lead";
 import { getCadenciaHoje, getCadenciaConcluidasHoje, getCadenciaAmanha, getDailyMetrics, DailyMetrics } from "@/store/leads-store";
 import { useAuth } from "@/contexts/AuthContext";
 import { ActivityModal } from "@/components/ActivityModal";
@@ -36,7 +36,7 @@ function ScoreBadge({ score }: { score: number | null }) {
   const color = score >= 70 ? "bg-success/15 text-success border-success/30"
     : score >= 40 ? "bg-warning/15 text-warning border-warning/30"
     : "bg-destructive/15 text-destructive border-destructive/30";
-  return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold border ${color}`}>{score}</span>;
+  return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold border ${color}`}>Pesquisa digital {score}/100</span>;
 }
 
 function SdrFocoView() {
@@ -127,7 +127,6 @@ function SdrFocoView() {
       ) : (
         <div className="space-y-2">
           {filteredCadencia.map((lead) => {
-            const step = CADENCE_STEPS[lead.dia_cadencia] || `Passo ${lead.dia_cadencia + 1}`;
             const isOverdue = lead.data_proximo_passo && new Date(lead.data_proximo_passo) < new Date();
             return (
               <div key={lead.id} className="rounded-lg border border-border bg-card p-3 flex items-center gap-3 hover:border-primary/30 transition-colors">
@@ -139,7 +138,9 @@ function SdrFocoView() {
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className={`text-xs font-medium ${isOverdue ? 'text-destructive' : 'text-primary'}`}>
-                      Dia {lead.dia_cadencia}: {step}
+                      {lead.data_proximo_passo
+                        ? `Próximo passo: ${new Date(lead.data_proximo_passo).toLocaleString("pt-BR")}`
+                        : "Próximo passo a definir"}
                     </span>
                     {isOverdue && <span className="text-xs text-destructive">(Atrasado)</span>}
                     <span className="text-xs text-muted-foreground">· {lead.cidade}</span>
@@ -164,7 +165,6 @@ function SdrFocoView() {
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-2">
             {filteredConcluidas.map((lead) => {
-              const step = CADENCE_STEPS[lead.dia_cadencia] || `Passo ${lead.dia_cadencia + 1}`;
               return (
                 <div key={lead.id} className="rounded-lg border border-border bg-card/50 p-3 flex items-center gap-3 opacity-70">
                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedLead(lead)}>
@@ -174,7 +174,7 @@ function SdrFocoView() {
                       <ScoreBadge score={lead.lead_score} />
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-muted-foreground">Dia {lead.dia_cadencia}: {step}</span>
+                      <span className="text-xs text-muted-foreground">Contato concluído hoje</span>
                       <span className="text-xs text-muted-foreground">· {lead.cidade}</span>
                     </div>
                   </div>
@@ -196,7 +196,6 @@ function SdrFocoView() {
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-2">
             {filteredAmanha.map((lead) => {
-              const step = CADENCE_STEPS[lead.dia_cadencia] || `Passo ${lead.dia_cadencia + 1}`;
               return (
                 <div key={lead.id} className="rounded-lg border border-dashed border-border bg-card/30 p-3 flex items-center gap-3">
                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setSelectedLead(lead)}>
@@ -206,7 +205,11 @@ function SdrFocoView() {
                       <ScoreBadge score={lead.lead_score} />
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-primary">Dia {lead.dia_cadencia}: {step}</span>
+                      <span className="text-xs text-primary">
+                        {lead.data_proximo_passo
+                          ? `Próximo passo: ${new Date(lead.data_proximo_passo).toLocaleString("pt-BR")}`
+                          : "Próximo passo amanhã"}
+                      </span>
                       <span className="text-xs text-muted-foreground">· {lead.cidade}</span>
                     </div>
                   </div>

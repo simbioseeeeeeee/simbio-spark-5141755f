@@ -5,10 +5,9 @@ interface Props {
   children: React.ReactNode;
   colorClass: string;
   count: number;
-  totalValue: number;
 }
 
-export function PipelineColumn({ id, children, colorClass, count, totalValue }: Props) {
+export function PipelineColumn({ id, children, colorClass, count }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div className="w-[280px] shrink-0">
@@ -17,11 +16,6 @@ export function PipelineColumn({ id, children, colorClass, count, totalValue }: 
           <span className="text-sm font-semibold">{id}</span>
           <span className="text-xs font-bold">{count}</span>
         </div>
-        {totalValue > 0 && (
-          <p className="text-xs opacity-75 mt-0.5">
-            R$ {totalValue.toLocaleString("pt-BR")}
-          </p>
-        )}
       </div>
       <div
         ref={setNodeRef}

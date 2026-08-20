@@ -1,7 +1,37 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Lead, Socio, Atividade, CADENCE_GAPS } from "@/types/lead";
+import { Lead, Socio, Atividade, PLAYBOOK_VERSION, type EstagioFunil } from "@/types/lead";
+import { validatePipelineTransition, type TransitionContext } from "@/lib/sales-pipeline";
 
 const PAGE_SIZE = 50;
+
+const ACTIVITY_TYPE_DB: Record<string, string> = {
+  WhatsApp: "whatsapp_out",
+  Ligação: "ligacao",
+  Email: "email_out",
+  Pesquisa: "nota",
+  Visita: "nota",
+};
+
+const ACTIVITY_RESULT_DB: Record<string, string> = {
+  Conectado: "sucesso",
+  Atendeu: "sucesso",
+  Respondeu: "sucesso",
+  "Não Atendeu": "sem_resposta",
+  "Caixa Postal": "sem_resposta",
+  "Sem Resposta": "sem_resposta",
+  "Agendou Reunião": "agendado",
+  Recusou: "recusa",
+  "Pesquisa Concluída": "sucesso",
+};
+
+export function mapActivityToDatabase(tipo: string, resultado: string) {
+  const tipoAtividade = ACTIVITY_TYPE_DB[tipo];
+  const resultadoAtividade = ACTIVITY_RESULT_DB[resultado];
+  if (!tipoAtividade || !resultadoAtividade) {
+    throw new Error("Tipo ou resultado de atividade fora do vocabulário comercial.");
+  }
+  return { tipoAtividade, resultadoAtividade };
+}
 
 function rowToLead(row: any): Lead {
   return {
@@ -39,20 +69,35 @@ function rowToLead(row: any): Lead {
     whatsapp_humano: row.whatsapp_humano || false,
     observacoes_sdr: row.observacoes_sdr || "",
     estagio_funil: row.estagio_funil || null,
-    valor_negocio_estimado: row.valor_negocio_estimado || null,
     data_proximo_passo: row.data_proximo_passo || null,
     observacoes_closer: row.observacoes_closer || "",
     pesquisa_realizada: row.pesquisa_realizada || false,
     lead_score: row.lead_score ?? null,
-    dia_cadencia: row.dia_cadencia ?? 0,
     status_cadencia: row.status_cadencia || "ativo",
     created_at: row.created_at,
     updated_at: row.updated_at ?? null,
     origem_lead: row.origem_lead ?? null,
     tipo_lead: row.tipo_lead ?? null,
-    owner_id: row.owner_id || null,
-    sdr_id: row.sdr_id || null,
-    canal_preferido: row.canal_preferido || "nao_definido",
+    motivo_perda: row.motivo_perda ?? null,
+    motivo_perda_detalhe: row.motivo_perda_detalhe ?? null,
+    meeting_event_id: row.meeting_event_id ?? null,
+    data_reuniao_agendada: row.data_reuniao_agendada ?? null,
+    reuniao_url: row.reuniao_url ?? row.reuniao_calendly_url ?? null,
+    stage_changed_at: row.stage_changed_at ?? null,
+    playbook_version: row.playbook_version ?? null,
+    fit_score: row.fit_score ?? null,
+    fit_score_breakdown: row.fit_score_breakdown ?? null,
+    execution_score: row.execution_score ?? null,
+    decisor_confirmado: row.decisor_confirmado ?? false,
+    oferta_comercial: row.oferta_comercial ?? null,
+    proposta_enviada_em: row.proposta_enviada_em ?? null,
+    aceite_em: row.aceite_em ?? null,
+    payment_status: row.payment_status ?? "nao_iniciado",
+    pagamento_em: row.pagamento_em ?? null,
+    ganho_override_em: row.ganho_override_em ?? null,
+    ganho_override_motivo: row.ganho_override_motivo ?? null,
+    pipeline_review_required: row.pipeline_review_required ?? false,
+    no_show_reagenda_tentativas: row.no_show_reagenda_tentativas ?? 0,
   };
 }
 
@@ -130,56 +175,48 @@ export async function registrarAtividade(
   nota: string,
   userId?: string
 ): Promise<Lead> {
-  // 1. Insert activity with sdr_id tracking
+  if (resultado === "Agendou Reunião") {
+    throw new Error("Use o agendamento com Calendar/Meet; a reunião exige event_id, data, horário e link reais.");
+  }
+
+  const mapped = mapActivityToDatabase(tipo, resultado);
+
   const insertData: any = {
-    lead_id: lead.id,
-    tipo_atividade: tipo,
-    resultado: resultado,
+    lead_cnpj: lead.cnpj || lead.id,
+    tipo_atividade: mapped.tipoAtividade,
+    resultado: mapped.resultadoAtividade,
     nota: nota,
+    playbook_version: PLAYBOOK_VERSION,
+    origem: lead.origem_lead || null,
+    canal: mapped.tipoAtividade,
+    direcao: "out",
+    metadados: {
+      ui_tipo: tipo,
+      ui_resultado: resultado,
+      detalhe: nota || null,
+    },
   };
-  if (userId) insertData.sdr_id = userId;
+  insertData.created_by = userId || "crm";
 
   const { error: actErr } = await supabase.from("atividades").insert(insertData);
   if (actErr) throw actErr;
 
-  // 2. Calculate next step
-  const novoDia = lead.dia_cadencia + 1;
-  const gapDias = CADENCE_GAPS[novoDia] || 2;
-  const proximoPasso = new Date();
-  proximoPasso.setDate(proximoPasso.getDate() + gapDias);
-
-  // 3. Determine new status
   let newStatus = lead.status_sdr;
-  let newStatusCadencia = lead.status_cadencia;
-  let newEstagioFunil = lead.estagio_funil;
-
-  if (resultado === "Agendou Reunião") {
-    newStatus = "Reunião Agendada" as any;
-    newStatusCadencia = "concluido";
-    newEstagioFunil = "Reunião Agendada" as any;
-  } else if (resultado === "Recusou") {
+  if (resultado === "Recusou") {
     newStatus = "Desqualificado" as any;
-    newStatusCadencia = "concluido";
-  } else if (novoDia >= 10) {
-    newStatusCadencia = "expirado";
   } else if (newStatus === "A Contatar") {
     newStatus = "Em Qualificação" as any;
   }
 
-  // 4. Update lead (also set sdr_id if not set)
   const updateData: any = {
-    dia_cadencia: novoDia,
-    status_cadencia: newStatusCadencia,
-    data_proximo_passo: proximoPasso.toISOString(),
     status_sdr: newStatus,
-    estagio_funil: newEstagioFunil,
+    playbook_version: PLAYBOOK_VERSION,
   };
-  if (userId && !lead.sdr_id) updateData.sdr_id = userId;
 
   const { data, error: updErr } = await supabase
     .from("leads")
     .update(updateData)
-    .eq("id", lead.id)
+    .eq("cnpj", lead.cnpj || lead.id)
     .select()
     .single();
   if (updErr) throw updErr;
@@ -237,7 +274,7 @@ export async function getLeadsPaginated(q: LeadsQuery): Promise<LeadsResult> {
     query = query.eq("pesquisa_realizada", false);
   }
 
-  if (q.scoreFilter === "qualificados") {
+  if (q.scoreFilter === "pesquisa_digital_60") {
     query = query.gte("lead_score", 60);
   }
 
@@ -321,15 +358,15 @@ export async function updateLead(lead: Lead): Promise<Lead> {
       whatsapp_humano: lead.whatsapp_humano,
       observacoes_sdr: lead.observacoes_sdr,
       estagio_funil: lead.estagio_funil,
-      valor_negocio_estimado: lead.valor_negocio_estimado,
       data_proximo_passo: lead.data_proximo_passo,
       observacoes_closer: lead.observacoes_closer,
       pesquisa_realizada: lead.pesquisa_realizada,
       lead_score: lead.lead_score,
-      dia_cadencia: lead.dia_cadencia,
-      status_cadencia: lead.status_cadencia,
-      canal_preferido: lead.canal_preferido || "nao_definido",
-    })
+      motivo_perda: lead.motivo_perda || null,
+      motivo_perda_detalhe: lead.motivo_perda_detalhe || null,
+      playbook_version: PLAYBOOK_VERSION,
+      pipeline_review_required: lead.pipeline_review_required ?? false,
+    } as any)
     // a PK de leads e cnpj — nao existe coluna id (era a razao de o drag nunca salvar)
     .eq("cnpj", lead.cnpj || lead.id)
     .select()
@@ -338,20 +375,63 @@ export async function updateLead(lead: Lead): Promise<Lead> {
   return rowToLead(data);
 }
 
+export async function transitionLeadStage(
+  lead: Lead,
+  target: EstagioFunil,
+  context: TransitionContext = {},
+): Promise<Lead> {
+  const validation = validatePipelineTransition(lead, target, context);
+  if ("reason" in validation) throw new Error(validation.reason);
+
+  const patch: Record<string, unknown> = {
+    estagio_funil: target,
+    playbook_version: PLAYBOOK_VERSION,
+  };
+  if (target === "Proposta Enviada") {
+    throw new Error("Proposta Enviada é registrada pela API após aprovação e envio reais.");
+  }
+  if (target === "Aguardando Pagamento") {
+    throw new Error("Aguardando Pagamento é atualizado pelo aceite do termo.");
+  }
+  if (target === "Fechado Ganho" && !context.managerOverride) {
+    throw new Error("Fechado Ganho é atualizado pelo webhook de pagamento.");
+  }
+  if (context.nextStepAt !== undefined) patch.data_proximo_passo = context.nextStepAt;
+  if (context.lossReason !== undefined) patch.motivo_perda = context.lossReason;
+  if (context.lossReasonDetail !== undefined) patch.motivo_perda_detalhe = context.lossReasonDetail;
+  if (context.offer !== undefined) patch.oferta_comercial = context.offer;
+  if (context.managerOverride) {
+    patch.ganho_override_motivo = context.managerOverrideReason;
+  }
+
+  const { data, error } = await (supabase.from("leads") as any)
+    .update(patch)
+    .eq("cnpj", lead.cnpj || lead.id)
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToLead(data);
+}
+
 export async function registrarReuniaoAgendada(
-  lead: Pick<Lead, "id" | "sdr_id" | "owner_id">,
+  lead: Pick<Lead, "id" | "cnpj">,
   userId?: string,
   nota = "Status alterado manualmente para Reunião Agendada."
 ): Promise<void> {
   // atividades usa lead_cnpj/created_by (nao lead_id/sdr_id/owner_id) e os valores
   // canonicos da casa sao tipo "reuniao" / resultado "agendado".
   const { error } = await supabase.from("atividades").insert({
-    lead_cnpj: lead.id,
+    lead_cnpj: lead.cnpj || lead.id,
     tipo_atividade: "reuniao",
     resultado: "agendado",
     nota,
     created_by: userId || "crm",
-  });
+    playbook_version: PLAYBOOK_VERSION,
+    origem: "crm_manual",
+    canal: "reuniao",
+    direcao: "out",
+    metadados: { event_source: "calendar", detalhe: nota },
+  } as any);
   if (error) throw error;
 }
 
@@ -363,7 +443,7 @@ export async function getStatusCounts(cidade: string): Promise<Record<string, nu
     .eq("cidade", cidade);
   if (totalErr) throw totalErr;
 
-  const statuses = ["A Contatar", "Em Qualificação", "Reunião Agendada"];
+  const statuses = ["A Contatar", "Em Qualificação", "Qualificado", "Reunião Agendada", "Nurturing", "Opt-out"];
   const counts: Record<string, number> = { all: total ?? 0 };
 
   await Promise.all(
@@ -382,7 +462,7 @@ export async function getStatusCounts(cidade: string): Promise<Record<string, nu
     .from("leads")
     .select("*", { count: "exact", head: true })
     .eq("cidade", cidade)
-    .like("status_sdr", "Desqualificado%");
+    .eq("status_sdr", "Desqualificado");
   if (!desqErr) counts["Desqualificado"] = desqCount ?? 0;
 
   return counts;
@@ -570,11 +650,14 @@ export async function getSdrPerformance(cidade: string | null, days: number): Pr
 
 // ─── Audit: Reunião Inconsistencies ─────────────────────────
 export interface ReuniaoInconsistency {
-  id: string;
+  cnpj: string;
   fantasia: string | null;
   razao_social: string | null;
   cidade: string | null;
   created_at: string;
+  meeting_event_id: string | null;
+  data_reuniao_agendada: string | null;
+  reuniao_url: string | null;
 }
 
 export async function getReuniaoInconsistencies(cidade: string | null): Promise<ReuniaoInconsistency[]> {
@@ -627,8 +710,8 @@ export interface FollowupEntry {
   data_proximo_passo: string | null;
   observacoes_sdr: string | null;
   observacoes_closer: string | null;
-  owner_id: string | null;
-  sdr_id: string | null;
+  responsavel_sdr: string | null;
+  responsavel_closer: string | null;
   ultimo_contato_em: string | null;
   ultimo_contato_tipo: string | null;
 }
@@ -653,7 +736,7 @@ export async function reagendarFollowup(leadId: string, novaData: Date): Promise
   const { error } = await supabase
     .from("leads")
     .update({ data_proximo_passo: novaData.toISOString() })
-    .eq("id", leadId);
+    .eq("cnpj", leadId);
   if (error) throw error;
 }
 

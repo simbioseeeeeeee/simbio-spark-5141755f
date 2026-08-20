@@ -14,10 +14,16 @@ interface Props {
   ultimoContatoTipo?: string | null;
 }
 
+const ACTIVITY_LABEL: Record<string, string> = {
+  whatsapp_out: "WhatsApp", whatsapp_in: "WhatsApp recebido", ligacao: "Ligação",
+  email_out: "E-mail", email_in: "E-mail recebido", reuniao: "Reunião", nota: "Nota",
+  sucesso: "sucesso", agendado: "agendado", sem_resposta: "sem resposta",
+  recusa: "recusou", erro: "erro", escalado: "escalado",
+};
+
 function daysInStage(lead: Lead): number | null {
-  if (!lead.data_proximo_passo && !lead.created_at) return null;
-  const ref = lead.data_proximo_passo || lead.created_at;
-  const diff = Date.now() - new Date(ref).getTime();
+  if (!lead.stage_changed_at) return null;
+  const diff = Date.now() - new Date(lead.stage_changed_at).getTime();
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
 }
 
@@ -62,16 +68,17 @@ export function PipelineCard({ lead, onClick, atividades, ultimoContatoEm, ultim
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        {lead.lead_score !== null && (
-          <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-bold ${
-            lead.lead_score >= 70 ? "bg-success/15 text-success" : lead.lead_score >= 40 ? "bg-warning/15 text-warning" : "bg-destructive/15 text-destructive"
-          }`}>{lead.lead_score} pts</span>
-        )}
-        {lead.valor_negocio_estimado != null && lead.valor_negocio_estimado > 0 && (
-          <span className="text-xs text-muted-foreground font-medium">
-            R$ {lead.valor_negocio_estimado.toLocaleString("pt-BR")}
+        {lead.pipeline_review_required && (
+          <span className="inline-flex rounded bg-warning/15 px-1.5 py-0.5 text-xs font-medium text-warning">
+            revisar migração
           </span>
         )}
+        <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-bold ${
+          (lead.fit_score ?? 0) >= 70 ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
+        }`}>Fit {lead.fit_score ?? "—"}/100</span>
+        <span className="inline-flex rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+          Execução {lead.execution_score ?? "—"}/100
+        </span>
       </div>
 
       {/* Quick actions */}
@@ -123,8 +130,8 @@ export function PipelineCard({ lead, onClick, atividades, ultimoContatoEm, ultim
         <div className="border-t border-border pt-2 space-y-1">
           {atividades.slice(0, 2).map((a) => (
             <div key={a.id} className="text-xs text-muted-foreground flex gap-1.5">
-              <span className="font-medium text-foreground/70">{a.tipo_atividade}</span>
-              <span>→ {a.resultado}</span>
+              <span className="font-medium text-foreground/70">{ACTIVITY_LABEL[a.tipo_atividade] || a.tipo_atividade}</span>
+              <span>→ {ACTIVITY_LABEL[a.resultado] || a.resultado}</span>
             </div>
           ))}
         </div>

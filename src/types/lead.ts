@@ -1,7 +1,41 @@
-export type LeadStatus = "A Contatar" | "Em Qualificação" | "Reunião Agendada" | "Desqualificado" | "Desqualificado - Sem Perfil" | "Desqualificado - Sem Budget" | "Desqualificado - Sem Interesse";
+export const PLAYBOOK_VERSION = "simbiose-sales-v2@2.1.0" as const;
+export const CATALOG_VERSION = "2.1.0" as const;
 
-export type EstagioFunil = "Reunião Agendada" | "Reunião Realizada" | "Proposta Enviada"
-  | "Aguardando Aceite" | "Em Negociação" | "Fechado Ganho" | "Fechado Perdido";
+export type LeadStatus =
+  | "A Contatar"
+  | "Em Qualificação"
+  | "Qualificado"
+  | "Reunião Agendada"
+  | "Nurturing"
+  | "Desqualificado"
+  | "Opt-out";
+
+export type EstagioFunil =
+  | "Reunião Agendada"
+  | "Diagnóstico Realizado"
+  | "Proposta Enviada"
+  | "Em Negociação"
+  | "Aguardando Aceite"
+  | "Aguardando Pagamento"
+  | "Fechado Ganho"
+  | "No-show"
+  | "Nurturing"
+  | "Desqualificado"
+  | "Opt-out"
+  | "Fechado Perdido";
+
+export type OfertaComercial = "Imersão" | "Demanda" | "Atendimento com IA" | "Operação de Vendas";
+export type OfferId = "imersao" | "demanda" | "atendimento_ia" | "operacao_vendas";
+export type Commitment = "unico" | "mensal" | "trimestral" | "anual";
+export type MotivoPerda =
+  | "sem_fit"
+  | "prioridade_timing"
+  | "investimento"
+  | "veto_decisor"
+  | "concorrente"
+  | "desistencia"
+  | "outro";
+export type PaymentStatus = "nao_iniciado" | "pendente" | "pago" | "vencido" | "cancelado";
 
 export type TipoAtividade = "WhatsApp" | "Ligação" | "Email" | "Pesquisa" | "Visita";
 export type ResultadoAtividade = "Conectado" | "Atendeu" | "Respondeu" | "Não Atendeu" | "Caixa Postal" | "Sem Resposta" | "Agendou Reunião" | "Recusou" | "Pesquisa Concluída";
@@ -14,8 +48,6 @@ export interface Socio {
   celular2?: string;
   email1?: string;
 }
-
-export type CanalPreferido = "whatsapp" | "telefone" | "email" | "linkedin" | "nao_definido";
 
 export type OrigemLead =
   | "receita_federal"
@@ -100,24 +132,38 @@ export interface Lead {
   whatsapp_humano: boolean;
   observacoes_sdr: string;
   estagio_funil: EstagioFunil | null;
-  valor_negocio_estimado: number | null;
   data_proximo_passo: string | null;
   observacoes_closer: string;
   pesquisa_realizada: boolean;
   lead_score: number | null;
-  dia_cadencia: number;
   status_cadencia: string;
   created_at: string;
   updated_at?: string | null;
   origem_lead?: string | null;
   tipo_lead?: string | null;
-  owner_id?: string | null;
-  sdr_id?: string | null;
-  canal_preferido?: CanalPreferido;
   // Campos reais do Supabase mdewbruvzrrxezsbyzmq (snake_case)
   responsavel_sdr?: string | null;
   responsavel_closer?: string | null;
   motivo_perda?: string | null;
+  motivo_perda_detalhe?: string | null;
+  meeting_event_id?: string | null;
+  data_reuniao_agendada?: string | null;
+  reuniao_url?: string | null;
+  stage_changed_at?: string | null;
+  playbook_version?: string | null;
+  fit_score?: number | null;
+  fit_score_breakdown?: Record<string, number> | null;
+  execution_score?: number | null;
+  decisor_confirmado?: boolean;
+  oferta_comercial?: OfertaComercial | null;
+  proposta_enviada_em?: string | null;
+  aceite_em?: string | null;
+  payment_status?: PaymentStatus | null;
+  pagamento_em?: string | null;
+  ganho_override_em?: string | null;
+  ganho_override_motivo?: string | null;
+  pipeline_review_required?: boolean;
+  no_show_reagenda_tentativas?: number;
   tentativas_followup?: number | null;
   data_ultimo_contato?: string | null;
   qtde_funcionarios?: number | null;
@@ -129,33 +175,60 @@ export interface Lead {
 
 export interface Atividade {
   id: string;
-  lead_id: string;
-  tipo_atividade: TipoAtividade;
-  resultado: ResultadoAtividade;
+  lead_cnpj: string;
+  tipo_atividade: string;
+  resultado: string;
   nota: string;
   created_at: string;
-  sdr_id?: string | null;
+  created_by?: string | null;
+  playbook_version?: string;
+  message_key?: string | null;
+  origem?: string | null;
+  canal?: string | null;
+  metadados?: Record<string, unknown>;
 }
 
 export const STATUS_OPTIONS: LeadStatus[] = [
   "A Contatar",
   "Em Qualificação",
+  "Qualificado",
   "Reunião Agendada",
+  "Nurturing",
   "Desqualificado",
-  "Desqualificado - Sem Perfil",
-  "Desqualificado - Sem Budget",
-  "Desqualificado - Sem Interesse",
+  "Opt-out",
 ];
 
 export const ESTAGIO_FUNIL_OPTIONS: EstagioFunil[] = [
   "Reunião Agendada",
-  "Reunião Realizada",
+  "Diagnóstico Realizado",
   "Proposta Enviada",
-  "Aguardando Aceite",
   "Em Negociação",
+  "Aguardando Aceite",
+  "Aguardando Pagamento",
   "Fechado Ganho",
+  "No-show",
+  "Nurturing",
+  "Desqualificado",
+  "Opt-out",
   "Fechado Perdido",
 ];
+
+export const OFERTA_OPTIONS: { id: OfferId; label: OfertaComercial }[] = [
+  { id: "imersao", label: "Imersão" },
+  { id: "demanda", label: "Demanda" },
+  { id: "atendimento_ia", label: "Atendimento com IA" },
+  { id: "operacao_vendas", label: "Operação de Vendas" },
+];
+
+export const MOTIVO_PERDA_LABEL: Record<MotivoPerda, string> = {
+  sem_fit: "Sem fit",
+  prioridade_timing: "Prioridade / timing",
+  investimento: "Investimento",
+  veto_decisor: "Veto do decisor",
+  concorrente: "Concorrente",
+  desistencia: "Desistência",
+  outro: "Outro",
+};
 
 export const TIPO_ATIVIDADE_OPTIONS: TipoAtividade[] = ["WhatsApp", "Ligação", "Email", "Pesquisa", "Visita"];
 
@@ -167,40 +240,26 @@ export const RESULTADO_OPTIONS: ResultadoAtividade[] = [
 export const STATUS_COLORS: Record<LeadStatus, string> = {
   "A Contatar": "bg-muted text-muted-foreground",
   "Em Qualificação": "bg-warning/15 text-warning border border-warning/30",
+  "Qualificado": "bg-success/15 text-success border border-success/30",
   "Reunião Agendada": "bg-primary/15 text-primary border border-primary/30",
+  "Nurturing": "bg-muted text-muted-foreground border",
   "Desqualificado": "bg-destructive/15 text-destructive border border-destructive/30",
-  "Desqualificado - Sem Perfil": "bg-destructive/15 text-destructive border border-destructive/30",
-  "Desqualificado - Sem Budget": "bg-destructive/15 text-destructive border border-destructive/30",
-  "Desqualificado - Sem Interesse": "bg-destructive/15 text-destructive border border-destructive/30",
+  "Opt-out": "bg-destructive/15 text-destructive border border-destructive/30",
 };
 
 export const ESTAGIO_COLORS: Record<EstagioFunil, string> = {
   "Reunião Agendada": "bg-primary/15 text-primary",
-  "Reunião Realizada": "bg-warning/15 text-warning",
+  "Diagnóstico Realizado": "bg-warning/15 text-warning",
   "Proposta Enviada": "bg-primary/15 text-primary",
-  "Aguardando Aceite": "bg-warning/15 text-warning",
   "Em Negociação": "bg-warning/15 text-warning",
+  "Aguardando Aceite": "bg-warning/15 text-warning",
+  "Aguardando Pagamento": "bg-warning/15 text-warning",
   "Fechado Ganho": "bg-success/15 text-success",
+  "No-show": "bg-destructive/15 text-destructive",
+  "Nurturing": "bg-muted text-muted-foreground",
+  "Desqualificado": "bg-destructive/15 text-destructive",
+  "Opt-out": "bg-destructive/15 text-destructive",
   "Fechado Perdido": "bg-destructive/15 text-destructive",
-};
-
-// Cadence step definitions (day -> action description)
-export const CADENCE_STEPS: Record<number, string> = {
-  0: "Primeira Tentativa de Contato",
-  1: "Enviar WhatsApp #1",
-  2: "Ligar para o Lead",
-  3: "Enviar WhatsApp #2",
-  4: "Ligar novamente",
-  5: "Enviar Email",
-  6: "WhatsApp de Follow-up",
-  7: "Ligar com abordagem diferente",
-  8: "WhatsApp Final",
-  9: "Última tentativa (Ligar)",
-};
-
-// Gap between cadence steps (in days)
-export const CADENCE_GAPS: Record<number, number> = {
-  0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 2, 7: 3, 8: 2, 9: 3,
 };
 
 export function calculateScore(lead: Pick<Lead, 'possui_site' | 'instagram_ativo' | 'faz_anuncios' | 'whatsapp_automacao' | 'whatsapp_humano'>): number {

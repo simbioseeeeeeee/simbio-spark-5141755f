@@ -1,7 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
-import { Lead, STATUS_OPTIONS, LeadStatus, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, calculateScore, CanalPreferido } from "@/types/lead";
+import {
+  Lead, STATUS_OPTIONS, LeadStatus, ESTAGIO_FUNIL_OPTIONS, EstagioFunil,
+  calculateScore, MOTIVO_PERDA_LABEL,
+  PLAYBOOK_VERSION, type MotivoPerda,
+} from "@/types/lead";
 import { LeadTimeline } from "./LeadTimeline";
-import { updateLead, registrarReuniaoAgendada, leadHasReuniaoActivity, getLeadsLastContact } from "@/store/leads-store";
+import { updateLead, transitionLeadStage, registrarReuniaoAgendada, leadHasReuniaoActivity, getLeadsLastContact } from "@/store/leads-store";
 import { lastContactLabel, lastContactColor, activityEmoji, CANAL_CONFIG } from "@/lib/contact-helpers";
 import { useAuth } from "@/contexts/AuthContext";
 import { CopyButton } from "./CopyButton";
@@ -21,7 +25,8 @@ import { StatusBadge } from "./StatusBadge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
-import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles, CheckCircle2, XCircle, MessageCircle } from "lucide-react";
+import { validateSdrTransition } from "@/lib/sales-pipeline";
+import { Building2, MapPin, Phone, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles, CheckCircle2, XCircle } from "lucide-react";
 
 // calculateScore is now imported from types/lead
 
@@ -35,7 +40,7 @@ function ScoreBadge({ score }: { score: number }) {
   return (
     <div className="flex items-center gap-3">
       <div className={`px-3 py-1 rounded-full text-sm font-bold border ${color}`}>
-        {score} pts
+        Pesquisa digital {score}/100
       </div>
       <Progress value={score} className="flex-1 h-2" />
     </div>
@@ -78,10 +83,11 @@ interface Props {
 }
 
 export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [form, setForm] = useState<Lead | null>(null);
   const [saving, setSaving] = useState(false);
   const [researching, setResearching] = useState(false);
+  const [managerOverrideApproved, setManagerOverrideApproved] = useState(false);
 
   const current = form?.id === lead?.id ? form : lead;
 
@@ -91,6 +97,7 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
   const [meetingLogged, setMeetingLogged] = useState<boolean | null>(null);
   const [lastContact, setLastContact] = useState<{ em: string | null; tipo: string | null }>({ em: null, tipo: null });
   useEffect(() => {
+    setManagerOverrideApproved(false);
     if (!lead?.id) {
       setMeetingLogged(null);
       setLastContact({ em: null, tipo: null });
@@ -152,11 +159,22 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
 
       // Log pesquisa activity for every AI research execution
       await supabase.from("atividades").insert({
-        lead_id: current.id,
-        tipo_atividade: "Pesquisa",
-        resultado: "Pesquisa Concluída",
+        lead_cnpj: current.cnpj || current.id,
+        tipo_atividade: "nota",
+        resultado: "sucesso",
         nota: `Pesquisa IA individual — Score: ${updated.lead_score}`,
-      });
+        created_by: user?.id || "crm",
+        playbook_version: PLAYBOOK_VERSION,
+        origem: current.origem_lead || "crm_manual",
+        canal: "pesquisa",
+        direcao: "out",
+        metadados: {
+          event: "research_completed",
+          ui_tipo: "Pesquisa",
+          ui_resultado: "Pesquisa Concluída",
+          lead_score: updated.lead_score,
+        },
+      } as any);
 
       toast({ title: "✅ Pesquisa concluída e salva!", description: `Score: ${updated.lead_score} pts.` });
     } catch (err: any) {
@@ -186,8 +204,40 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
         pesquisa_realizada: true,
       };
 
+      if (lead && toSave.status_sdr !== lead.status_sdr) {
+        const statusValidation = validateSdrTransition(
+          lead.status_sdr,
+          toSave.status_sdr,
+          toSave.meeting_event_id,
+          toSave.data_reuniao_agendada,
+          toSave.reuniao_url,
+        );
+        if ("reason" in statusValidation) throw new Error(statusValidation.reason);
+      }
+
       const shouldLogMeeting = lead?.status_sdr !== "Reunião Agendada" && toSave.status_sdr === "Reunião Agendada";
-      const updated = await updateLead(toSave);
+      let transitionResult: Lead | null = null;
+      if (toSave.estagio_funil && toSave.estagio_funil !== lead?.estagio_funil) {
+        transitionResult = await transitionLeadStage(lead || toSave, toSave.estagio_funil, {
+          eventId: toSave.meeting_event_id,
+          meetingAt: toSave.data_reuniao_agendada,
+          meetingUrl: toSave.reuniao_url,
+          nextStepAt: toSave.data_proximo_passo,
+          lossReason: (toSave.motivo_perda || null) as MotivoPerda | null,
+          lossReasonDetail: toSave.motivo_perda_detalhe,
+          offer: toSave.oferta_comercial,
+          managerOverride: role === "manager" && managerOverrideApproved,
+          managerOverrideReason: toSave.ganho_override_motivo,
+        });
+      }
+      const updated = await updateLead({
+        ...toSave,
+        estagio_funil: transitionResult?.estagio_funil ?? toSave.estagio_funil,
+        proposta_enviada_em: transitionResult?.proposta_enviada_em ?? toSave.proposta_enviada_em,
+        ganho_override_em: transitionResult?.ganho_override_em ?? toSave.ganho_override_em,
+        ganho_override_motivo: transitionResult?.ganho_override_motivo ?? toSave.ganho_override_motivo,
+        playbook_version: transitionResult?.playbook_version ?? toSave.playbook_version,
+      });
       let meetingLogError: string | null = null;
 
       if (shouldLogMeeting) {
@@ -262,7 +312,7 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
           <div className="mt-3">
             <div className="flex items-center gap-2 mb-1">
               <Zap className="h-4 w-4 text-primary" />
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Lead Score</span>
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pesquisa digital</span>
             </div>
             <ScoreBadge score={score} />
           </div>
@@ -432,22 +482,6 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                 <Separator />
 
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2"><MessageCircle className="h-4 w-4" /> Canal Preferido</Label>
-                  <Select value={current.canal_preferido || "nao_definido"} onValueChange={(v) => setField("canal_preferido", v as CanalPreferido)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="nao_definido">Não definido</SelectItem>
-                      <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                      <SelectItem value="telefone">Telefone</SelectItem>
-                      <SelectItem value="email">Email</SelectItem>
-                      <SelectItem value="linkedin">LinkedIn</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-2">
                   <Label>Notas e Observações (SDR)</Label>
                   <Textarea rows={3} placeholder="Anote aqui o que percebeu no site, Instagram, etc." value={current.observacoes_sdr} onChange={(e) => setField("observacoes_sdr", e.target.value)} />
                 </div>
@@ -459,6 +493,17 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                   <DollarSign className="h-4 w-4 text-success" /> Painel do Closer
                 </h3>
 
+                {current.pipeline_review_required && (
+                  <div className="flex items-center justify-between rounded-md border border-amber-400/50 bg-amber-500/5 p-3">
+                    <Label htmlFor="pipeline-review">Dados migrados revisados</Label>
+                    <Switch
+                      id="pipeline-review"
+                      checked={!current.pipeline_review_required}
+                      onCheckedChange={(checked) => setField("pipeline_review_required", !checked)}
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label>Estágio do Funil</Label>
                   <Select value={current.estagio_funil || ""} onValueChange={(v) => setField("estagio_funil", (v || null) as EstagioFunil | null)}>
@@ -469,15 +514,112 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2"><DollarSign className="h-4 w-4" /> Valor Estimado do Negócio</Label>
-                  <Input
-                    type="number"
-                    placeholder="R$ 0,00"
-                    value={current.valor_negocio_estimado ?? ""}
-                    onChange={(e) => setField("valor_negocio_estimado", e.target.value ? Number(e.target.value) : null)}
-                  />
-                </div>
+                {(current.estagio_funil === "Reunião Agendada" || current.status_sdr === "Reunião Agendada") && (
+                  <div className="space-y-3 rounded-md border p-3">
+                    <div className="space-y-2">
+                      <Label>Event ID da agenda</Label>
+                      <p className="break-all rounded-md bg-muted px-3 py-2 text-sm">
+                        {current.meeting_event_id || "Ainda não confirmado pelo Calendar"}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Data e horário da reunião</Label>
+                      <p className="rounded-md bg-muted px-3 py-2 text-sm">
+                        {current.data_reuniao_agendada
+                          ? new Date(current.data_reuniao_agendada).toLocaleString("pt-BR")
+                          : "Ainda não confirmado pelo Calendar"}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Link da reunião</Label>
+                      {current.reuniao_url ? (
+                        <a className="block break-all rounded-md bg-muted px-3 py-2 text-sm text-primary underline"
+                          href={current.reuniao_url} target="_blank" rel="noreferrer">
+                          {current.reuniao_url}
+                        </a>
+                      ) : (
+                        <p className="rounded-md bg-muted px-3 py-2 text-sm">Ainda não confirmado pelo Calendar</p>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Evidência somente leitura; alterações vêm do Calendar/Meet.</p>
+                  </div>
+                )}
+
+                {current.estagio_funil && ["Diagnóstico Realizado", "Proposta Enviada", "Em Negociação", "Aguardando Aceite", "Aguardando Pagamento"].includes(current.estagio_funil) && (
+                  <div className="space-y-2">
+                    <Label>Oferta comercial</Label>
+                    <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                      {current.oferta_comercial || "Definida somente pela cotação na aba Reunião"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Somente leitura; preço e oferta vêm do snapshot do catálogo.</p>
+                  </div>
+                )}
+
+                {current.estagio_funil === "Aguardando Pagamento" && (
+                  <div className="space-y-1 rounded-md border p-3">
+                    <Label>Aceite</Label>
+                    <p className="text-sm font-medium">
+                      {current.aceite_em
+                        ? `Confirmado pelo termo em ${new Date(current.aceite_em).toLocaleString("pt-BR")}`
+                        : "Pendente de confirmação pelo termo"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Campo somente leitura; atualizado pelo webhook.</p>
+                  </div>
+                )}
+
+                {(current.estagio_funil === "Aguardando Pagamento" || current.estagio_funil === "Fechado Ganho") && (
+                  <div className="space-y-1 rounded-md border p-3">
+                    <Label>Status do pagamento</Label>
+                    <p className="text-sm font-medium capitalize">{(current.payment_status || "nao_iniciado").replace(/_/g, " ")}</p>
+                    <p className="text-xs text-muted-foreground">Campo somente leitura; atualizado pela cobrança/webhook.</p>
+                  </div>
+                )}
+
+                {current.estagio_funil === "Fechado Ganho" && current.payment_status !== "pago" && role === "manager" && (
+                  <div className="space-y-3 rounded-md border border-amber-400/60 bg-amber-500/5 p-3">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={managerOverrideApproved}
+                        onChange={(e) => setManagerOverrideApproved(e.target.checked)}
+                      />
+                      Confirmo o override gerencial sem pagamento
+                    </label>
+                    <Textarea
+                      rows={2}
+                      placeholder="Justificativa obrigatória e auditada"
+                      value={current.ganho_override_motivo || ""}
+                      onChange={(e) => setField("ganho_override_motivo", e.target.value || null)}
+                    />
+                  </div>
+                )}
+
+                {current.estagio_funil === "Fechado Perdido" && (
+                  <div className="space-y-3 rounded-md border border-destructive/40 p-3">
+                    <div className="space-y-2">
+                      <Label>Motivo da perda</Label>
+                      <Select
+                        value={current.motivo_perda || ""}
+                        onValueChange={(v) => setField("motivo_perda", v as MotivoPerda)}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Obrigatório" /></SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(MOTIVO_PERDA_LABEL) as MotivoPerda[]).map((motivo) => (
+                            <SelectItem key={motivo} value={motivo}>{MOTIVO_PERDA_LABEL[motivo]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {current.motivo_perda === "outro" && (
+                      <Textarea
+                        rows={2}
+                        placeholder="Explique o motivo"
+                        value={current.motivo_perda_detalhe || ""}
+                        onChange={(e) => setField("motivo_perda_detalhe", e.target.value || null)}
+                      />
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2"><Calendar className="h-4 w-4" /> Data do Próximo Passo</Label>
@@ -515,6 +657,20 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                 email={current.email1 || null}
                 whatsapp={current.celular1 || current.telefone1 || null}
                 userName={user?.email?.split("@")[0] || "crm"}
+                meetingEventId={current.meeting_event_id || null}
+                onAssessmentSaved={({ fitScore, executionScore, decisionMakerConfirmed, stage, nextStepAt }) => {
+                  setForm((previous) => {
+                    const base = previous?.id === current.id ? previous : current;
+                    return {
+                      ...base,
+                      fit_score: fitScore,
+                      execution_score: executionScore,
+                      decisor_confirmado: decisionMakerConfirmed,
+                      estagio_funil: stage,
+                      data_proximo_passo: nextStepAt,
+                    };
+                  });
+                }}
               />
             )}
           </TabsContent>
