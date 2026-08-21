@@ -44,12 +44,15 @@ const SDR_ITEMS: NavItem[] = [
 ];
 
 const CLOSER_ITEMS: NavItem[] = [
-  ...NEW_ITEMS,
+  // Social Selling sai: a rota só aceita sdr/manager, então o item levava o
+  // closer a um redirect de volta pro pipeline (parecia link quebrado).
+  ...NEW_ITEMS.filter((i) => i.url !== "/social-selling"),
   { title: "Pipeline", url: "/closer", icon: Columns3 },
 ];
 
 const MANAGER_ITEMS: NavItem[] = [
   ...NEW_ITEMS,
+  { title: "Painel do Gerente", url: "/manager/painel", icon: BarChart3 },
   { title: "Cadência SDR", url: "/manager/cadencia", icon: Crosshair },
   { title: "Pipeline Closer", url: "/manager/pipeline", icon: Columns3 },
   { title: "Saúde do Sistema", url: "/manager/sistema", icon: Activity },

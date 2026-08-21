@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import { Instagram, MapPin, Check, Search, ExternalLink, Heart, MessageSquareText, UserPlus, Send } from "lucide-react";
 
 // Mapa diário de social selling (Rayana). Uma linha POR IMOBILIÁRIA, com marcação

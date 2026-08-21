@@ -8,9 +8,12 @@ interface Props {
 }
 
 export function ProtectedRoute({ children, allowedRoles }: Props) {
-  const { user, role, loading } = useAuth();
+  const { user, role, loading, roleLoading } = useAuth();
 
-  if (loading) {
+  // Espera TAMBÉM o papel: com só `loading`, existia uma janela de
+  // user-carregado/role-nula em que este guard expulsava o usuário pra /login
+  // (e de lá pro workspace). Era o motivo de F5 em qualquer rota perder a página.
+  if (loading || (user && roleLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

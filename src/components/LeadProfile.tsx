@@ -434,13 +434,13 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
               </CardContent>
             </Card>
 
-            {current.socios.length > 0 && (
+            {(current.socios?.length ?? 0) > 0 && (
               <Card className="border-0 shadow-none bg-muted/50">
                 <CardHeader className="pb-2 pt-3 px-4">
                   <CardTitle className="text-sm font-medium flex items-center gap-2"><User className="h-4 w-4" /> Quadro Societário</CardTitle>
                 </CardHeader>
                 <CardContent className="px-4 pb-3 space-y-3">
-                  {current.socios.map((socio, i) => (
+                  {(current.socios ?? []).map((socio, i) => (
                     <div key={i} className="space-y-1">
                       <p className="font-medium text-sm">{socio.nome}</p>
                       <div className="flex flex-col gap-1">

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import { Clapperboard, Check, X, Pencil, Play, Plus } from "lucide-react";
 
 // Gate humano dos criativos. Antes era lista de link no chat; agora o Guilherme
@@ -65,17 +66,30 @@ export default function Criativos() {
 
   async function decidir(c: Criativo, status: Status) {
     setSalvando(c.id);
+    const anterior = c.status;
     setItens((prev) => prev.map((x) => (x.id === c.id ? { ...x, status } : x)));
-    await supabase.from("criativos" as any)
-      .update({ status, aprovado_por: "guilherme" })
+    const { data: sess } = await supabase.auth.getUser();
+    const { error } = await supabase.from("criativos" as any)
+      // quem aprovou vem da sessão (era "guilherme" fixo, mentindo a autoria)
+      .update({ status, aprovado_por: sess?.user?.email || "crm" })
       .eq("id", c.id);
+    if (error) {
+      setItens((prev) => prev.map((x) => (x.id === c.id ? { ...x, status: anterior } : x)));
+      toast({ title: "Não consegui salvar a decisão", description: error.message, variant: "destructive" });
+    }
     setSalvando(null);
   }
 
   async function salvarNota(c: Criativo, nota: string) {
+    const anterior = c.nota;
     setItens((prev) => prev.map((x) => (x.id === c.id ? { ...x, nota } : x)));
     setEditandoNota(null);
-    await supabase.from("criativos" as any).update({ nota: nota || null }).eq("id", c.id);
+    const { error } = await supabase.from("criativos" as any)
+      .update({ nota: nota || null }).eq("id", c.id);
+    if (error) {
+      setItens((prev) => prev.map((x) => (x.id === c.id ? { ...x, nota: anterior } : x)));
+      toast({ title: "Não consegui salvar a nota", description: error.message, variant: "destructive" });
+    }
   }
 
 

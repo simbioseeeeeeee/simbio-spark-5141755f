@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import { Target, MessageCircle, Instagram, Flame, Megaphone, MapPin, Send } from "lucide-react";
 
 // Máquina de Agendamento — métrica-mãe: reuniões de diagnóstico agendadas hoje.
@@ -94,10 +95,20 @@ export default function MetasComercial() {
 
   async function salvarPraca() {
     setSalvando(true);
-    await supabase.from("comercial_config")
+    const { data, error } = await supabase.from("comercial_config")
       .update({ praca_atual: pracaEdit.trim() || null, updated_at: new Date().toISOString() })
-      .eq("id", 1);
-    setPraca(pracaEdit.trim());
+      .eq("id", 1)
+      .select("id");
+    if (error || !data?.length) {
+      toast({
+        title: "Não consegui salvar a praça",
+        description: error?.message || "nenhuma linha foi atualizada",
+        variant: "destructive",
+      });
+    } else {
+      setPraca(pracaEdit.trim());
+      toast({ title: "Praça atualizada", description: "Vale para o Social Selling e o painel." });
+    }
     setSalvando(false);
   }
 

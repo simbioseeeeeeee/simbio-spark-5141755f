@@ -132,7 +132,7 @@ export function ActivityModal({ lead, open, onClose, onDone, userId }: Props) {
             </Card>
 
             {/* Sócios */}
-            {lead.socios.length > 0 && (
+            {(lead.socios?.length ?? 0) > 0 && (
               <Card className="border-0 shadow-none bg-muted/50">
                 <CardHeader className="pb-1 pt-2 px-3">
                   <CardTitle className="text-xs font-medium flex items-center gap-1.5">
@@ -140,7 +140,7 @@ export function ActivityModal({ lead, open, onClose, onDone, userId }: Props) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="px-3 pb-2 space-y-2">
-                  {lead.socios.map((socio, i) => (
+                  {(lead.socios ?? []).map((socio, i) => (
                     <div key={i} className="space-y-1">
                       <p className="font-medium text-xs">{socio.nome}</p>
                       <div className="flex flex-col gap-0.5">

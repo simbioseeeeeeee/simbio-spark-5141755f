@@ -9,6 +9,8 @@ interface AuthContextType {
   role: AppRole | null;
   userName: string;
   loading: boolean;
+  /** true enquanto o papel do usuário ainda está sendo buscado */
+  roleLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -18,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
   role: null,
   userName: "",
   loading: true,
+  roleLoading: true,
   signIn: async () => {},
   signOut: async () => {},
 });
@@ -57,12 +60,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [userName, setUserName] = useState("");
   const [loading, setLoading] = useState(true);
+  // O papel é buscado num efeito SEPARADO do da sessão. Sem este estado havia
+  // uma janela com loading=false + user preenchido + role=null, e o
+  // ProtectedRoute expulsava o usuário: dar F5 em /leads mandava pra /login e
+  // de lá pro workspace do papel. Só o clique no menu funcionava.
+  const [roleLoading, setRoleLoading] = useState(true);
   const initializedRef = useRef(false);
 
   const fetchRole = async (userId: string) => {
     const { data, error } = await supabase.rpc("get_user_role", { _user_id: userId });
 
     if (error || !data) {
+      if (error) console.error("[auth] get_user_role falhou:", error.message);
       setRole(null);
       setUserName("");
       return;
@@ -95,16 +104,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    const applySession = (session: Session | null) => {
+    // `finalize` só é true na resolução do getSession(): o onAuthStateChange
+    // dispara INITIAL_SESSION antes da restauração do storage terminar, e
+    // finalizar ali deixava loading=false com user=null por um instante — o
+    // ProtectedRoute mandava pra /login e de lá pro workspace. Era isso que
+    // fazia F5 (ou link direto) perder a página aberta.
+    const applySession = (session: Session | null, finalize = true) => {
       if (!mounted) return;
-      setUser(session?.user ?? null);
+      const u = session?.user ?? null;
+      setUser(u);
 
-      if (!session?.user) {
+      if (!u) {
         setRole(null);
         setUserName("");
+        if (finalize || initializedRef.current) setRoleLoading(false);
       }
 
-      finalizeInit();
+      if (finalize || initializedRef.current) finalizeInit();
     };
 
     const stallTimeout = window.setTimeout(() => {
@@ -117,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      applySession(session);
+      applySession(session, false);
     });
 
     (async () => {
@@ -145,12 +161,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       setRole(null);
       setUserName("");
+      setRoleLoading(false);
       return;
     }
 
+    setRoleLoading(true);
     (async () => {
-      await fetchRole(user.id);
-      if (cancelled) return;
+      try {
+        await fetchRole(user.id);
+      } finally {
+        if (!cancelled) setRoleLoading(false);
+      }
     })();
 
     return () => {
@@ -171,7 +192,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, role, userName, loading, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{ user, role, userName, loading, roleLoading, signIn, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );

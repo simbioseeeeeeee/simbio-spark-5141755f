@@ -48,7 +48,7 @@ export async function listarTarefasPendentes(): Promise<SdrTask[]> {
     .eq("status", "pendente")
     .order("prioridade", { ascending: false })
     .order("created_at", { ascending: true })
-    .limit(120);
+    .limit(400); // a fila real já passou de 120 — cortar em silêncio escondia tarefa
   if (error) throw error;
   return (data || []).map((r: any) => ({
     ...r,

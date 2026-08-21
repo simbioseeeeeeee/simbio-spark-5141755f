@@ -38,7 +38,9 @@ describe("integração frontend do comercial V2", () => {
 
   it("mantém agenda somente leitura no perfil", () => {
     const source = read("src/components/LeadProfile.tsx");
-    expect(source).toContain("Evidência somente leitura; alterações vêm do Calendar/Meet.");
+    // o texto agora explica as 3 fontes que preenchem sozinhas (Larissa,
+    // Calendar sync, tl;dv) em vez de cobrar o event_id do closer
+    expect(source).toContain("Preenchido automaticamente");
     expect(source).not.toContain('setField("meeting_event_id"');
     expect(source).not.toContain('setField("data_reuniao_agendada"');
     expect(source).not.toContain('setField("reuniao_url"');

@@ -27,3 +27,5 @@ dist-ssr
 # Envs locais — NUNCA commitar (podem conter chaves)
 .env.local
 .env.*.local
+test-results/
+playwright-report/

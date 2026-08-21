@@ -36,8 +36,10 @@ const App = () => (
             <Route path="/sdr" element={<ProtectedRoute allowedRoles={["sdr", "manager"]}><SdrWorkspace /></ProtectedRoute>} />
             <Route path="/sdr/anuncios" element={<ProtectedRoute allowedRoles={["sdr", "manager"]}><SdrWorkspace /></ProtectedRoute>} />
             <Route path="/closer" element={<ProtectedRoute allowedRoles={["closer", "manager"]}><CloserWorkspace /></ProtectedRoute>} />
-            {/* Analytics saiu (competia com /campanhas); /manager cai no pipeline */}
+            {/* /manager continua caindo no pipeline (entrada do gerente); o painel
+                de KPIs/metas ganhou rota própria — antes era código inalcançável */}
             <Route path="/manager" element={<ProtectedRoute allowedRoles={["manager"]}><Navigate to="/manager/pipeline" replace /></ProtectedRoute>} />
+            <Route path="/manager/painel" element={<ProtectedRoute allowedRoles={["manager"]}><ManagerWorkspace /></ProtectedRoute>} />
             <Route path="/manager/cadencia" element={<ProtectedRoute allowedRoles={["manager"]}><ManagerWorkspace /></ProtectedRoute>} />
             <Route path="/manager/pipeline" element={<ProtectedRoute allowedRoles={["manager"]}><ManagerWorkspace /></ProtectedRoute>} />
             <Route path="/manager/sistema" element={<ProtectedRoute allowedRoles={["manager"]}><ManagerSistema /></ProtectedRoute>} />

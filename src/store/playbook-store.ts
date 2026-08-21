@@ -68,9 +68,18 @@ export async function listarObjecoes(): Promise<Objecao[]> {
 }
 
 export async function salvarObjecao(o: Partial<Objecao> & { id: string }) {
-  const { error } = await supabase.from("objecoes" as any)
-    .upsert({ ...o, updated_at: new Date().toISOString() });
+  // UPDATE, não UPSERT: a tela só edita resposta/não-fazer de objeções que já
+  // existem. Com upsert de payload parcial, o Postgres tratava como INSERT e
+  // recusava com 23502 (categoria NOT NULL) — editar objeção nunca salvava.
+  const { id, ...campos } = o;
+  const { data, error } = await supabase.from("objecoes" as any)
+    .update({ ...campos, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("id");
   if (error) throw error;
+  if (!data || (data as any[]).length === 0) {
+    throw new Error(`Objeção ${id} não encontrada — recarregue a página.`);
+  }
 }
 
 export async function statsObjecoes(): Promise<ObjecaoStats[]> {

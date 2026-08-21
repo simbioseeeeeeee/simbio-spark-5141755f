@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import { ListChecks, Circle, PlayCircle, CheckCircle2, Ban, Filter } from "lucide-react";
 
 // Backlog do sprint comercial. É a FONTE DE VERDADE do que está sendo executado —
@@ -76,17 +77,32 @@ export default function Plano() {
     return () => { supabase.removeChannel(ch); };
   }, [load]);
 
+  // O update era feito sem ler o erro: a tela pintava o novo status e a gravação
+  // podia ter falhado (RLS, coluna, rede) sem ninguém saber. Agora falha reverte
+  // o otimismo e avisa.
   async function mudarStatus(t: Tarefa, novo: Status) {
     setSalvando(t.id);
+    const anterior = t.status;
     setTarefas((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: novo } : x)));
-    await supabase.from("plano_tarefas" as any).update({ status: novo }).eq("id", t.id);
+    const { error } = await supabase.from("plano_tarefas" as any)
+      .update({ status: novo }).eq("id", t.id);
+    if (error) {
+      setTarefas((prev) => prev.map((x) => (x.id === t.id ? { ...x, status: anterior } : x)));
+      toast({ title: "Não consegui salvar o status", description: error.message, variant: "destructive" });
+    }
     setSalvando(null);
   }
 
   async function salvarNota(t: Tarefa, nota: string) {
+    const anterior = t.nota;
     setTarefas((prev) => prev.map((x) => (x.id === t.id ? { ...x, nota } : x)));
     setEditandoNota(null);
-    await supabase.from("plano_tarefas" as any).update({ nota: nota || null }).eq("id", t.id);
+    const { error } = await supabase.from("plano_tarefas" as any)
+      .update({ nota: nota || null }).eq("id", t.id);
+    if (error) {
+      setTarefas((prev) => prev.map((x) => (x.id === t.id ? { ...x, nota: anterior } : x)));
+      toast({ title: "Não consegui salvar a nota", description: error.message, variant: "destructive" });
+    }
   }
 
   const visiveis = useMemo(() => {
