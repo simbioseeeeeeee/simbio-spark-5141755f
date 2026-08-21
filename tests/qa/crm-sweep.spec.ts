@@ -96,7 +96,8 @@ for (const [papel, cfg] of Object.entries(POR_PAPEL)) {
         achados.push({ rota: r, tipo: "redirect", detalhe: `foi para ${url.pathname}` });
       }
       const corpo = (await page.locator("body").innerText()).slice(0, 400);
-      if (/404|página não encontrada|not found/i.test(corpo)) {
+      // "404" solto dá falso positivo (telefone da lista contém 404) — exige contexto
+      if (/erro 404|página não encontrada|page not found|not found/i.test(corpo)) {
         achados.push({ rota: r, tipo: "404", detalhe: corpo.slice(0, 150) });
       }
       if (corpo.trim().length < 40) {
