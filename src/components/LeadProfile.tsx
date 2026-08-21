@@ -363,6 +363,15 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
               <MessageCircle className="h-3.5 w-3.5" />
               WhatsApp oficial
             </Button>
+            {/* SDR marca o diagnóstico daqui: o evento nasce no Google Agenda com
+                Meet e o lead já vai pra "Reunião Agendada" — antes era tudo na mão */}
+            {current.estagio_funil !== "Reunião Agendada" && (
+              <Button size="sm" variant="outline" className="gap-1.5"
+                      onClick={() => setAgendando(true)}>
+                <Calendar className="h-3.5 w-3.5" />
+                Agendar reunião
+              </Button>
+            )}
           </div>
           {compondoWpp && (
             <div className="mt-2 space-y-2">
@@ -759,6 +768,26 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
             )}
           </TabsContent>
         </Tabs>
+        {agendando && current && (
+          <AgendarReuniaoModal
+            cnpj={current.cnpj || current.id}
+            nomeLead={current.fantasia || current.razao_social || current.contato_nome || ""}
+            open={agendando}
+            onClose={() => setAgendando(false)}
+            onAgendado={(d) => {
+              const atualizado = {
+                ...current,
+                status_sdr: "Reunião Agendada" as any,
+                estagio_funil: "Reunião Agendada" as any,
+                data_reuniao_agendada: d.data_reuniao,
+                reuniao_url: d.meet_link,
+                meeting_event_id: d.event_id,
+              };
+              setForm(atualizado);
+              onSaved(atualizado);
+            }}
+          />
+        )}
       </SheetContent>
     </Sheet>
   );

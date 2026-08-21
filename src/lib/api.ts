@@ -33,3 +33,21 @@ export function ligarParaLead(leadCnpj: string) {
 export function enviarWhatsAppLead(leadCnpj: string, texto: string) {
   return apiPost<{ ok: boolean }>("/api/crm/whatsapp/enviar", { lead_cnpj: leadCnpj, texto });
 }
+
+export type AgendamentoOk = {
+  ok: true;
+  meet_link: string | null;
+  event_id: string | null;
+  data_legivel: string;
+  data_reuniao: string;
+};
+
+/** SDR marca o diagnóstico: cria o evento no Google Agenda com Meet, move o
+ *  lead pra "Reunião Agendada" e registra a atividade. Antes disso a SDR
+ *  marcava na mão na agenda e o CRM nunca ficava sabendo. */
+export async function agendarReuniao(leadCnpj: string, quandoIso: string) {
+  return apiPost<AgendamentoOk>("/api/crm/agenda/book", {
+    lead_cnpj: leadCnpj,
+    quando_iso: quandoIso,
+  });
+}
