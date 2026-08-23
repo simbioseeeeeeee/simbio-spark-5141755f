@@ -91,6 +91,7 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
   const [managerOverrideApproved, setManagerOverrideApproved] = useState(false);
   const [acionando, setAcionando] = useState<"ligar" | "wpp" | null>(null);
   const [compondoWpp, setCompondoWpp] = useState(false);
+  const [agendando, setAgendando] = useState(false);
   const [textoWpp, setTextoWpp] = useState("");
 
   async function acionarLigacao() {
