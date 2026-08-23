@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
 import {
   Lead, STATUS_OPTIONS, LeadStatus, ESTAGIO_FUNIL_OPTIONS, EstagioFunil,
-  calculateScore, MOTIVO_PERDA_LABEL,
+  calculateScore, MOTIVO_PERDA_LABEL, OFERTA_OPTIONS,
   PLAYBOOK_VERSION, type MotivoPerda,
 } from "@/types/lead";
 import { LeadTimeline } from "./LeadTimeline";
 import { updateLead, transitionLeadStage, registrarReuniaoAgendada, leadHasReuniaoActivity, getLeadsLastContact } from "@/store/leads-store";
+import { archiveLead } from "@/store/leads-overhaul-store";
 import { lastContactLabel, lastContactColor, activityEmoji, CANAL_CONFIG } from "@/lib/contact-helpers";
 import { useAuth } from "@/contexts/AuthContext";
 import { CopyButton } from "./CopyButton";
@@ -373,6 +374,20 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                 Agendar reunião
               </Button>
             )}
+            <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground hover:text-destructive"
+                    onClick={async () => {
+                      if (!window.confirm("Arquivar este lead? Ele sai do pipeline e das filas, mas o histórico fica guardado (Arquivo Morto).")) return;
+                      try {
+                        await archiveLead(current.cnpj || current.id);
+                        toast({ title: "Lead arquivado", description: "Saiu do pipeline; histórico preservado." });
+                        onSaved({ ...current, status_sdr: "Arquivo Morto" as any, estagio_funil: null as any });
+                        onClose();
+                      } catch (e: any) {
+                        toast({ title: "Erro ao arquivar", description: String(e?.message || e), variant: "destructive" });
+                      }
+                    }}>
+              Arquivar
+            </Button>
           </div>
           {compondoWpp && (
             <div className="mt-2 space-y-2">
@@ -642,10 +657,21 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                 {current.estagio_funil && ["Diagnóstico Realizado", "Proposta Enviada", "Em Negociação", "Aguardando Aceite", "Aguardando Pagamento"].includes(current.estagio_funil) && (
                   <div className="space-y-2">
                     <Label>Oferta comercial</Label>
-                    <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
-                      {current.oferta_comercial || "Definida somente pela cotação na aba Reunião"}
+                    <Select
+                      value={current.oferta_comercial || ""}
+                      onValueChange={(v) => setField("oferta_comercial", v as any)}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Obrigatória para Proposta Enviada" /></SelectTrigger>
+                      <SelectContent>
+                        {OFERTA_OPTIONS.map((o) => (
+                          <SelectItem key={o.id} value={o.label}>{o.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      A cotação na aba Reunião continua sendo o caminho completo (preço e snapshot do catálogo);
+                      a reunião transcrita pelo tl;dv também preenche sozinha quando a oferta fica clara na conversa.
                     </p>
-                    <p className="text-xs text-muted-foreground">Somente leitura; preço e oferta vêm do snapshot do catálogo.</p>
                   </div>
                 )}
 

@@ -246,6 +246,26 @@ export async function registrarAtividade(
     playbook_version: PLAYBOOK_VERSION,
   };
 
+  // "Registrar e AVANÇAR CADÊNCIA": o botão prometia, mas nada avançava — o lead
+  // continuava na fila de hoje (get_cadencia_hoje pega data_proximo_passo <= now)
+  // como "Atrasado" pra sempre. Toque executado = conta a tentativa, carimba o
+  // último contato e empurra o próximo passo (régua 1/2/3/5/7 dias por tentativa).
+  // A régua automática do servidor pode reprogramar por cima — aqui o mínimo é
+  // tirar o lead da fila de HOJE. Recusa sai da régua de vez.
+  const tentativas = (Number((lead as any).tentativas_followup) || 0) + 1;
+  updateData.tentativas_followup = tentativas;
+  updateData.data_ultimo_contato = new Date().toISOString();
+  if (resultado === "Recusou") {
+    updateData.data_proximo_passo = null;
+  } else {
+    const DIAS_POR_TENTATIVA = [1, 2, 3, 5, 7];
+    const dias = DIAS_POR_TENTATIVA[Math.min(tentativas - 1, DIAS_POR_TENTATIVA.length - 1)];
+    const proximo = new Date();
+    proximo.setDate(proximo.getDate() + dias);
+    proximo.setHours(9, 0, 0, 0);
+    updateData.data_proximo_passo = proximo.toISOString();
+  }
+
   const { data, error: updErr } = await supabase
     .from("leads")
     .update(updateData)

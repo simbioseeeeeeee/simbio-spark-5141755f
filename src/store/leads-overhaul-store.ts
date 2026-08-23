@@ -409,3 +409,13 @@ export async function getRecentLeads(limit = 10): Promise<Lead[]> {
   if (error) throw error;
   return (data || []).map(rowToLead);
 }
+
+/** Tira o lead da operação SEM apagar histórico: Arquivo Morto + fora do pipeline.
+ *  (Excluir de verdade apagaria atividades e faria o pos-reuniao recriar o card.) */
+export async function archiveLead(cnpj: string): Promise<void> {
+  const { error } = await supabase
+    .from("leads")
+    .update({ status_sdr: "Arquivo Morto", estagio_funil: null })
+    .eq("cnpj", cnpj);
+  if (error) throw error;
+}
