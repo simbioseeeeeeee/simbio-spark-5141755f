@@ -14,6 +14,24 @@ CREATE INDEX IF NOT EXISTS idx_leads_deleted_at
   ON public.leads (deleted_at)
   WHERE deleted_at IS NOT NULL;
 
+-- As politicas antigas eram permissivas (USING true). A Lixeira precisa ser
+-- protegida no banco, nao apenas escondida pela interface.
+DROP POLICY IF EXISTS auth_read_leads ON public.leads;
+CREATE POLICY auth_read_leads
+  ON public.leads FOR SELECT TO authenticated
+  USING (deleted_at IS NULL OR public.has_role(auth.uid(), 'manager'));
+
+DROP POLICY IF EXISTS auth_update_leads ON public.leads;
+CREATE POLICY auth_update_leads
+  ON public.leads FOR UPDATE TO authenticated
+  USING (deleted_at IS NULL)
+  WITH CHECK (deleted_at IS NULL);
+
+DROP POLICY IF EXISTS auth_write_leads ON public.leads;
+CREATE POLICY auth_write_leads
+  ON public.leads FOR INSERT TO authenticated
+  WITH CHECK (deleted_at IS NULL);
+
 CREATE TABLE IF NOT EXISTS public.crm_lead_deletion_audit (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   lead_cnpj text NOT NULL,

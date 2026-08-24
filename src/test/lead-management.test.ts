@@ -21,6 +21,8 @@ describe("cadastro e Lixeira de leads", () => {
     expect(migration).toContain("status = 'cancelada'");
     expect(migration).toContain("status = 'cancelled'");
     expect(migration).not.toMatch(/DELETE\s+FROM\s+public\.leads/i);
+    expect(migration).toContain("deleted_at IS NULL OR public.has_role(auth.uid(), 'manager')");
+    expect(migration).toContain("WITH CHECK (deleted_at IS NULL)");
   });
 
   it("bloqueia exclusão de relações comerciais sensíveis", () => {
