@@ -24,6 +24,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { LeadDetailSheet } from "@/components/LeadDetailSheet";
+import { NewLeadModal } from "@/components/NewLeadModal";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Search,
   MessageCircle,
@@ -50,6 +52,7 @@ const TABS: { value: StatusTab; label: string }[] = [
 ];
 
 export default function LeadsOverhaul() {
+  const { role } = useAuth();
   const [tab, setTab] = useState<StatusTab>("A Contatar");
   const [page, setPage] = useState(0);
   const [result, setResult] = useState<OverhaulResult>({
@@ -81,6 +84,14 @@ export default function LeadsOverhaul() {
   // detail sheet
   const [openSheet, setOpenSheet] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const visibleTabs = useMemo(
+    () => role === "manager" ? [...TABS, { value: "Lixeira" as StatusTab, label: "Lixeira" }] : TABS,
+    [role]
+  );
+
+  useEffect(() => {
+    if (role && role !== "manager" && tab === "Lixeira") setTab("A Contatar");
+  }, [role, tab]);
 
   useEffect(() => {
     getDistinctResponsaveis()
@@ -201,6 +212,14 @@ export default function LeadsOverhaul() {
           </div>
 
           <div className="flex items-center gap-2">
+            <NewLeadModal
+              onCreated={() => {
+                setTab("A Contatar");
+                setPage(0);
+                void loadLeads();
+                void loadCounts();
+              }}
+            />
             <div className="flex items-center gap-2 border border-border rounded-md px-3 py-1.5 bg-card">
               <Switch
                 id="hide-acelerador"
@@ -228,7 +247,7 @@ export default function LeadsOverhaul() {
         {/* Tabs */}
         <Tabs value={tab} onValueChange={(v) => setTab(v as StatusTab)}>
           <TabsList className="w-full justify-start flex-wrap h-auto p-1 gap-1">
-            {TABS.map((t) => (
+            {visibleTabs.map((t) => (
               <TabsTrigger key={t.value} value={t.value} className="gap-2 data-[state=active]:shadow-sm">
                 <span>{t.label}</span>
                 <Badge variant="secondary" className="text-xs">
@@ -570,6 +589,10 @@ export default function LeadsOverhaul() {
           if (!o) setSelectedLeadId(null);
         }}
         leadId={selectedLeadId}
+        onChanged={() => {
+          void loadLeads();
+          void loadCounts();
+        }}
       />
     </AppLayout>
   );

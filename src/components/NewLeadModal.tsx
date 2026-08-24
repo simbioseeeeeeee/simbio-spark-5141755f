@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { UserPlus, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -24,10 +25,12 @@ export function NewLeadModal({ onCreated }: Props) {
     cnpj: "",
     razao_social: "",
     fantasia: "",
+    contato_nome: "",
     cidade: "",
     uf: "",
     celular1: "",
     email1: "",
+    observacoes_sdr: "",
   });
 
   const update = (field: string, value: string) =>
@@ -44,37 +47,35 @@ export function NewLeadModal({ onCreated }: Props) {
       return;
     }
 
-    const { data: existing } = await supabase
-      .from("leads")
-      .select("cnpj")
-      .eq("cnpj", cnpj)
-      .limit(1);
-    if (existing && existing.length > 0) {
-      toast({ title: "CNPJ já cadastrado", description: "Já existe um lead com esse CNPJ.", variant: "destructive" });
-      return;
-    }
-
     setSaving(true);
     try {
-      const { error } = await supabase.from("leads").insert({
-        cnpj,
-        razao_social: form.razao_social.trim(),
-        fantasia: form.fantasia.trim() || null,
-        cidade: form.cidade.trim().toUpperCase() || null,
-        uf: form.uf.trim().toUpperCase() || null,
-        celular1: form.celular1.trim() || null,
-        email1: form.email1.trim() || null,
-        status_sdr: "A Contatar",
-        status_cadencia: "ativo",
+      const { error } = await supabase.rpc("crm_create_manual_lead", {
+        p_cnpj: cnpj,
+        p_razao_social: form.razao_social.trim(),
+        p_fantasia: form.fantasia.trim() || undefined,
+        p_contato_nome: form.contato_nome.trim() || undefined,
+        p_cidade: form.cidade.trim() || undefined,
+        p_uf: form.uf.trim() || undefined,
+        p_celular: form.celular1.trim() || undefined,
+        p_email: form.email1.trim() || undefined,
+        p_origem: "outros",
+        p_observacoes: form.observacoes_sdr.trim() || undefined,
       });
       if (error) throw error;
 
       toast({ title: "✅ Lead cadastrado!", description: `${form.razao_social} adicionado com sucesso.` });
-      setForm({ cnpj: "", razao_social: "", fantasia: "", cidade: "", uf: "", celular1: "", email1: "" });
+      setForm({
+        cnpj: "", razao_social: "", fantasia: "", contato_nome: "", cidade: "", uf: "",
+        celular1: "", email1: "", observacoes_sdr: "",
+      });
       setOpen(false);
       onCreated?.();
-    } catch (err: any) {
-      toast({ title: "Erro ao cadastrar", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({
+        title: "Erro ao cadastrar",
+        description: err instanceof Error ? err.message : "Não foi possível cadastrar o lead.",
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -85,12 +86,12 @@ export function NewLeadModal({ onCreated }: Props) {
       <DialogTrigger asChild>
         <Button className="gap-1.5">
           <UserPlus className="h-4 w-4" />
-          Cadastrar Lead Manual
+          Novo lead
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Cadastrar Nova Empresa</DialogTitle>
+          <DialogTitle>Cadastrar novo lead</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
           <div className="space-y-1.5">
@@ -104,6 +105,10 @@ export function NewLeadModal({ onCreated }: Props) {
           <div className="space-y-1.5">
             <Label htmlFor="fantasia">Nome Fantasia</Label>
             <Input id="fantasia" placeholder="Nome fantasia" value={form.fantasia} onChange={(e) => update("fantasia", e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="contato_nome">Pessoa de contato</Label>
+            <Input id="contato_nome" placeholder="Nome do contato" value={form.contato_nome} onChange={(e) => update("contato_nome", e.target.value)} />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2 space-y-1.5">
@@ -122,6 +127,10 @@ export function NewLeadModal({ onCreated }: Props) {
           <div className="space-y-1.5">
             <Label htmlFor="email1">E-mail</Label>
             <Input id="email1" type="email" placeholder="email@empresa.com" value={form.email1} onChange={(e) => update("email1", e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="observacoes_sdr">Contexto inicial</Label>
+            <Textarea id="observacoes_sdr" rows={3} placeholder="Como chegou, interesse ou próximo passo..." value={form.observacoes_sdr} onChange={(e) => update("observacoes_sdr", e.target.value)} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>

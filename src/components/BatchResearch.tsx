@@ -35,6 +35,7 @@ export function BatchResearch({ cidade, onComplete }: Props) {
     let query = supabase
       .from("leads")
       .select("*")
+      .is("deleted_at", null)
       .eq("pesquisa_realizada", false)
       .order("created_at", { ascending: true })
       .limit(500);

@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Lead } from "@/types/lead";
-import { getLeadById, getLeadByCnpj } from "@/store/leads-overhaul-store";
+import {
+  getLeadById,
+  getLeadByCnpj,
+  restoreDeletedLead,
+  softDeleteLead,
+} from "@/store/leads-overhaul-store";
 import {
   Sheet,
   SheetContent,
@@ -15,7 +20,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Phone,
   MessageCircle,
@@ -26,6 +44,10 @@ import {
   Calendar,
   ChevronDown,
   ClipboardPlus,
+  AlertTriangle,
+  Loader2,
+  RotateCcw,
+  Trash2,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -35,16 +57,22 @@ interface Props {
   cnpj?: string | null;
   open: boolean;
   onOpenChange: (o: boolean) => void;
+  onChanged?: () => void;
 }
 
-export function LeadDetailSheet({ leadId, cnpj, open, onOpenChange }: Props) {
-  const { user } = useAuth();
+export function LeadDetailSheet({ leadId, cnpj, open, onOpenChange, onChanged }: Props) {
+  const { user, role } = useAuth();
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSocios, setShowSocios] = useState(false);
   const [editando, setEditando] = useState(false);
   const [registrandoAtividade, setRegistrandoAtividade] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -65,6 +93,54 @@ export function LeadDetailSheet({ leadId, cnpj, open, onOpenChange }: Props) {
     if (!num) return "#";
     const digits = num.replace(/\D/g, "");
     return `https://wa.me/55${digits}`;
+  };
+
+  const handleDelete = async () => {
+    if (!lead) return;
+    setDeleting(true);
+    try {
+      await softDeleteLead(lead.cnpj, deleteReason.trim());
+      toast({
+        title: "Lead movido para a Lixeira",
+        description: "Atendimento e tarefas pendentes foram interrompidos. O histórico foi preservado.",
+      });
+      setDeleteOpen(false);
+      setDeleteReason("");
+      setDeleteConfirmation("");
+      onOpenChange(false);
+      onChanged?.();
+    } catch (error: unknown) {
+      toast({
+        title: "Não foi possível excluir",
+        description: error instanceof Error ? error.message : "Revise os dados e tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!lead) return;
+    setRestoring(true);
+    try {
+      await restoreDeletedLead(lead.cnpj);
+      const restored = await getLeadById(lead.cnpj);
+      setLead(restored);
+      onChanged?.();
+      toast({
+        title: "Lead restaurado",
+        description: "O lead voltou ao CRM com a automação pausada para revisão humana.",
+      });
+    } catch (error: unknown) {
+      toast({
+        title: "Não foi possível restaurar",
+        description: error instanceof Error ? error.message : "Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setRestoring(false);
+    }
   };
 
   return (
@@ -104,6 +180,26 @@ export function LeadDetailSheet({ leadId, cnpj, open, onOpenChange }: Props) {
 
         {!loading && lead && (
           <div className="space-y-5">
+            {lead.deleted_at && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-destructive">Lead na Lixeira</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Excluído em {format(new Date(lead.deleted_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}.
+                      {lead.deletion_reason && <> Motivo: {lead.deletion_reason}</>}
+                    </div>
+                  </div>
+                  {role === "manager" && (
+                    <Button size="sm" variant="outline" onClick={handleRestore} disabled={restoring}>
+                      {restoring ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-1.5 h-4 w-4" />}
+                      Restaurar
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
             {/* Razão social */}
             {lead.razao_social && lead.razao_social !== lead.fantasia && (
               <div className="text-sm text-muted-foreground">{lead.razao_social}</div>
@@ -335,21 +431,35 @@ export function LeadDetailSheet({ leadId, cnpj, open, onOpenChange }: Props) {
               </>
             )}
 
-            <Separator />
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setRegistrandoAtividade(true)}>
-                <ClipboardPlus className="mr-2 h-4 w-4" aria-hidden="true" />
-                Registrar atividade
-              </Button>
-              <Button variant="default" className="flex-1" onClick={() => setEditando(true)}>
-                Editar / avançar estágio
-              </Button>
-              <Button variant="outline" className="flex-1" asChild>
-                <a href={waUrl(lead.celular1 || lead.telefone1)} target="_blank" rel="noreferrer">
-                  Abrir WhatsApp
-                </a>
-              </Button>
-            </div>
+            {!lead.deleted_at && (
+              <>
+                <Separator />
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setRegistrandoAtividade(true)}>
+                    <ClipboardPlus className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Registrar atividade
+                  </Button>
+                  <Button variant="default" className="flex-1" onClick={() => setEditando(true)}>
+                    Editar / avançar estágio
+                  </Button>
+                  <Button variant="outline" className="flex-1" asChild>
+                    <a href={waUrl(lead.celular1 || lead.telefone1)} target="_blank" rel="noreferrer">
+                      Abrir WhatsApp
+                    </a>
+                  </Button>
+                  {role === "manager" && (
+                    <Button
+                      variant="outline"
+                      className="w-full border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => setDeleteOpen(true)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Excluir lead
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
       </SheetContent>
@@ -381,6 +491,53 @@ export function LeadDetailSheet({ leadId, cnpj, open, onOpenChange }: Props) {
           });
         }}
       />
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir este lead?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O lead sairá das listas, métricas, tarefas e automações. O histórico será preservado na Lixeira e poderá ser restaurado por um gestor.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="delete-reason">Motivo da exclusão</Label>
+              <Textarea
+                id="delete-reason"
+                value={deleteReason}
+                onChange={(event) => setDeleteReason(event.target.value)}
+                placeholder="Ex.: cadastro duplicado ou empresa fora do perfil"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="delete-confirmation">
+                Digite o CNPJ <span className="font-mono">{lead?.cnpj}</span> para confirmar
+              </Label>
+              <Input
+                id="delete-confirmation"
+                value={deleteConfirmation}
+                onChange={(event) => setDeleteConfirmation(event.target.value.replace(/\D/g, ""))}
+                placeholder="Somente números"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDelete();
+              }}
+              disabled={deleting || deleteReason.trim().length < 5 || deleteConfirmation !== lead?.cnpj}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+              Mover para Lixeira
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }

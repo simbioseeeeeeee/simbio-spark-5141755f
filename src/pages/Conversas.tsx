@@ -80,6 +80,7 @@ export default function Conversas() {
         ? supabase
             .from("leads")
             .select("cnpj,fantasia,status_sdr")
+            .is("deleted_at", null)
             .ilike("celular1", `%${String(c.contact_phone).replace(/\D/g, "").slice(-9)}%`)
             .limit(1)
             .maybeSingle()

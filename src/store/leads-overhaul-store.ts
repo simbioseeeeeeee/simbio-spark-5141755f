@@ -81,6 +81,9 @@ function rowToLead(row: any): Lead {
     cnae_grupo: row.cnae_grupo || null,
     cnae_setor: row.cnae_setor || null,
     tipo_empresa: row.tipo_empresa || null,
+    deleted_at: row.deleted_at || null,
+    deleted_by: row.deleted_by || null,
+    deletion_reason: row.deletion_reason || null,
   };
 }
 
@@ -95,7 +98,8 @@ export type StatusTab =
   | "Fechado Perdido"
   | "Nurturing"
   | "Opt-out"
-  | "Desqualificado";
+  | "Desqualificado"
+  | "Lixeira";
 
 export interface OverhaulQuery {
   page: number;
@@ -119,8 +123,12 @@ export interface OverhaulResult {
 }
 
 function applyCommonFilters(query: any, q: OverhaulQuery) {
+  query = q.tab === "Lixeira"
+    ? query.not("deleted_at", "is", null)
+    : query.is("deleted_at", null);
+
   // Tabs usam apenas o vocabulário canônico do playbook V2.
-  if (q.tab !== "all") {
+  if (q.tab !== "all" && q.tab !== "Lixeira") {
     if (q.tab === "Desqualificado") {
       query = query.eq("status_sdr", "Desqualificado");
     } else if (q.tab === "Em Negociação") {
@@ -219,6 +227,7 @@ export async function getTabCounts(
     "Nurturing",
     "Opt-out",
     "Desqualificado",
+    "Lixeira",
   ];
 
   const results = await Promise.all(
@@ -266,8 +275,8 @@ export async function getDistinctResponsaveis(): Promise<
   { user_id: string; nome: string; role: string }[]
 > {
   const [sdrs, closers] = await Promise.all([
-    supabase.from("leads").select("responsavel_sdr").not("responsavel_sdr", "is", null).limit(5000),
-    supabase.from("leads").select("responsavel_closer").not("responsavel_closer", "is", null).limit(5000),
+    supabase.from("leads").select("responsavel_sdr").is("deleted_at", null).not("responsavel_sdr", "is", null).limit(5000),
+    supabase.from("leads").select("responsavel_closer").is("deleted_at", null).not("responsavel_closer", "is", null).limit(5000),
   ]);
 
   const names = new Map<string, string>();
@@ -302,6 +311,7 @@ export async function getOrigemDistribution(): Promise<{ origem: string; total: 
       const { count, error } = await supabase
         .from("leads")
         .select("*", { count: "exact", head: true })
+        .is("deleted_at", null)
         .eq("origem_lead", origem);
       if (error) return { origem, total: 0 };
       return { origem, total: count ?? 0 };
@@ -325,7 +335,7 @@ export async function getStatusDistribution(hideAcelerador = true): Promise<
   ];
   const results = await Promise.all(
     statuses.map(async (s) => {
-      let q = supabase.from("leads").select("*", { count: "exact", head: true });
+      let q = supabase.from("leads").select("*", { count: "exact", head: true }).is("deleted_at", null);
       if (s === "Desqualificado") {
         q = q.eq("status_sdr", "Desqualificado");
       } else {
@@ -355,6 +365,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const { count: ativos } = await supabase
     .from("leads")
     .select("*", { count: "exact", head: true })
+    .is("deleted_at", null)
     .not("status_sdr", "in", '("Nurturing","Desqualificado","Opt-out")')
     .or('estagio_funil.is.null,estagio_funil.not.in.("Nurturing","Desqualificado","Opt-out","Fechado Perdido","Fechado Ganho")')
     .or("tipo_lead.neq.programa_acelerador,tipo_lead.is.null");
@@ -365,6 +376,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const { count: novos } = await supabase
     .from("leads")
     .select("*", { count: "exact", head: true })
+    .is("deleted_at", null)
     .gte("updated_at", sevenAgo.toISOString())
     .or("tipo_lead.neq.programa_acelerador,tipo_lead.is.null");
 
@@ -372,11 +384,13 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const { count: aContatar } = await supabase
     .from("leads")
     .select("*", { count: "exact", head: true })
+    .is("deleted_at", null)
     .eq("status_sdr", "A Contatar")
     .or("tipo_lead.neq.programa_acelerador,tipo_lead.is.null");
   const { count: reuniao } = await supabase
     .from("leads")
     .select("*", { count: "exact", head: true })
+    .is("deleted_at", null)
     .eq("status_sdr", "Reunião Agendada")
     .or("tipo_lead.neq.programa_acelerador,tipo_lead.is.null");
 
@@ -387,6 +401,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const { count: prontos } = await supabase
     .from("leads")
     .select("*", { count: "exact", head: true })
+    .is("deleted_at", null)
     .not("estagio_funil", "is", null)
     .not("estagio_funil", "in", '("Nurturing","Desqualificado","Opt-out","Fechado Perdido","Fechado Ganho")');
 
@@ -403,6 +418,7 @@ export async function getRecentLeads(limit = 10): Promise<Lead[]> {
   const { data, error } = await supabase
     .from("leads")
     .select("*")
+    .is("deleted_at", null)
     .or("tipo_lead.neq.programa_acelerador,tipo_lead.is.null")
     .order("updated_at", { ascending: false, nullsFirst: false })
     .limit(limit);
@@ -416,6 +432,21 @@ export async function archiveLead(cnpj: string): Promise<void> {
   const { error } = await supabase
     .from("leads")
     .update({ status_sdr: "Arquivo Morto", estagio_funil: null })
-    .eq("cnpj", cnpj);
+    .eq("cnpj", cnpj)
+    .is("deleted_at", null);
+  if (error) throw error;
+}
+
+export async function softDeleteLead(cnpj: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc("crm_soft_delete_lead", {
+    p_cnpj: cnpj,
+    p_reason: reason,
+    p_confirmation: cnpj,
+  });
+  if (error) throw error;
+}
+
+export async function restoreDeletedLead(cnpj: string): Promise<void> {
+  const { error } = await supabase.rpc("crm_restore_deleted_lead", { p_cnpj: cnpj });
   if (error) throw error;
 }

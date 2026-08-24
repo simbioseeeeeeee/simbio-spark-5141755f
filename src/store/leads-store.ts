@@ -135,6 +135,7 @@ export async function getSdrPipelineLeads(): Promise<Lead[]> {
   const { data, error } = await supabase
     .from("leads")
     .select("*")
+    .is("deleted_at", null)
     .in("status_sdr", [...SDR_PIPELINE_STATUSES])
     .order("updated_at", { ascending: false })
     .limit(1_000);
@@ -302,7 +303,7 @@ export interface LeadsResult {
 }
 
 export async function getLeadsPaginated(q: LeadsQuery): Promise<LeadsResult> {
-  let query = supabase.from("leads").select("*", { count: "exact" });
+  let query = supabase.from("leads").select("*", { count: "exact" }).is("deleted_at", null);
 
   if (q.cidade && q.cidade !== "__all__") {
     query = query.eq("cidade", q.cidade);
@@ -376,6 +377,7 @@ export async function getKanbanLeads(cidade?: string): Promise<Lead[]> {
   let query = supabase
     .from("leads")
     .select("*")
+    .is("deleted_at", null)
     .or("status_sdr.eq.Reunião Agendada,estagio_funil.not.is.null");
 
   if (cidade) {
@@ -477,7 +479,8 @@ export async function getStatusCounts(cidade: string): Promise<Record<string, nu
   const { count: total, error: totalErr } = await supabase
     .from("leads")
     .select("*", { count: "exact", head: true })
-    .eq("cidade", cidade);
+    .eq("cidade", cidade)
+    .is("deleted_at", null);
   if (totalErr) throw totalErr;
 
   const statuses = ["A Contatar", "Em Qualificação", "Qualificado", "Reunião Agendada", "Nurturing", "Opt-out"];
@@ -489,6 +492,7 @@ export async function getStatusCounts(cidade: string): Promise<Record<string, nu
         .from("leads")
         .select("*", { count: "exact", head: true })
         .eq("cidade", cidade)
+        .is("deleted_at", null)
         .eq("status_sdr", s);
       if (!error) counts[s] = count ?? 0;
     })
@@ -499,6 +503,7 @@ export async function getStatusCounts(cidade: string): Promise<Record<string, nu
     .from("leads")
     .select("*", { count: "exact", head: true })
     .eq("cidade", cidade)
+    .is("deleted_at", null)
     .eq("status_sdr", "Desqualificado");
   if (!desqErr) counts["Desqualificado"] = desqCount ?? 0;
 

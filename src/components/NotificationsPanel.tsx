@@ -47,6 +47,7 @@ export function NotificationsPanel() {
     const { data: leads } = await (supabase
       .from("leads")
       .select("cnpj, fantasia, razao_social")
+      .is("deleted_at", null)
       .in("cnpj", leadCnpjs) as any);
 
     const leadMap = new Map((leads || []).map((l: any) => [l.cnpj, l.fantasia || l.razao_social || "Lead"]));

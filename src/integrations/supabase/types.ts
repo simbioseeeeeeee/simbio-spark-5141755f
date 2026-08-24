@@ -29,6 +29,10 @@ export type LeadDatabaseRow = {
   data_reuniao_agendada: string | null
   data_ultimo_contato: string | null
   decisor_confirmado: boolean
+  deleted_at: string | null
+  deleted_by: string | null
+  deletion_reason: string | null
+          deleted_previous_state: Json | null
   email1: string | null
   email2: string | null
   estagio_funil: string | null
@@ -317,6 +321,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      crm_create_manual_lead: {
+        Args: {
+          p_cidade?: string
+          p_celular?: string
+          p_cnpj: string
+          p_contato_nome?: string
+          p_email?: string
+          p_fantasia?: string
+          p_observacoes?: string
+          p_origem?: string
+          p_razao_social: string
+          p_uf?: string
+        }
+        Returns: Json
+      }
+      crm_restore_deleted_lead: { Args: { p_cnpj: string }; Returns: Json }
+      crm_soft_delete_lead: {
+        Args: { p_cnpj: string; p_confirmation: string; p_reason: string }
+        Returns: Json
+      }
+      crm_valid_cnpj: { Args: { p_value: string }; Returns: boolean }
       distinct_cidades: {
         Args: { p_uf?: string }
         Returns: {

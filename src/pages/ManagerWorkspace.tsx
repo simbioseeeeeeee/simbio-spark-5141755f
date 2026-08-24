@@ -350,7 +350,7 @@ function DrillDownDialog({ open, onClose, statusFilter, territorio }: { open: bo
     if (!open || !statusFilter) return;
     setLoading(true);
     const loadLeads = async () => {
-      let query = supabase.from("leads").select("*").eq("status_sdr", "Desqualificado");
+      let query = supabase.from("leads").select("*").is("deleted_at", null).eq("status_sdr", "Desqualificado");
       if (statusFilter === "__other__") {
         query = query.or('motivo_perda.is.null,motivo_perda.not.in.("sem_fit","investimento","desistencia")');
       } else {

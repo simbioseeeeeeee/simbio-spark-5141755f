@@ -194,6 +194,9 @@ export interface Lead {
   cnae_grupo?: string | null;
   cnae_setor?: string | null;
   tipo_empresa?: string | null;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  deletion_reason?: string | null;
 }
 
 export interface Atividade {

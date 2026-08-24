@@ -133,6 +133,7 @@ export function AdsExplorer() {
           const { data: leads } = await supabase
             .from("leads")
             .select("*")
+            .is("deleted_at", null)
             .or(`razao_social.ilike.%${searchTerm}%,fantasia.ilike.%${searchTerm}%`)
             .limit(1);
 

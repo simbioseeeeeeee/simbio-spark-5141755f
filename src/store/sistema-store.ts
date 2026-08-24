@@ -60,6 +60,7 @@ export async function getSistemaSummary(): Promise<SistemaSummary> {
       .select(
         "cnpj, fantasia, contato_nome, status_sdr, origem_lead, data_proximo_passo, tentativas_followup"
       )
+      .is("deleted_at", null)
       .gte("data_proximo_passo", nowIso)
       .lte("data_proximo_passo", next24)
       .order("data_proximo_passo", { ascending: true })
