@@ -1,4 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
+import { qaPassword } from "./credentials";
 
 // Valida os 3 pontos que o CEO reportou em 21/08:
 //  1. /manager/pipeline → card → aba Reunião NÃO pode dizer "Catálogo indisponível"
@@ -6,12 +7,11 @@ import { test, expect, Page } from "@playwright/test";
 //  3. ficha do lead precisa ter o botão de agendar reunião
 
 const BASE = process.env.QA_BASE_URL || "https://crm.simbiosedigital.com";
-const SENHA = process.env.QA_SENHA || "QaSimbiose2026!";
 
 async function login(page: Page, email: string) {
   await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
   await page.getByLabel(/e-?mail/i).fill(email);
-  await page.getByLabel(/senha/i).fill(SENHA);
+  await page.getByLabel(/senha/i).fill(qaPassword());
   await page.getByRole("button", { name: /entrar/i }).click();
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 25000 });
   await page.waitForTimeout(1500);

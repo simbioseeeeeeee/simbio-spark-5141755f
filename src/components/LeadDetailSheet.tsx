@@ -10,6 +10,9 @@ import {
 } from "@/components/ui/sheet";
 import { OrigemBadge, TipoBadge } from "@/components/OrigemBadge";
 import { LeadProfile } from "@/components/LeadProfile";
+import { ActivityModal } from "@/components/ActivityModal";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -22,6 +25,7 @@ import {
   User,
   Calendar,
   ChevronDown,
+  ClipboardPlus,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -34,19 +38,26 @@ interface Props {
 }
 
 export function LeadDetailSheet({ leadId, cnpj, open, onOpenChange }: Props) {
+  const { user } = useAuth();
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSocios, setShowSocios] = useState(false);
   const [editando, setEditando] = useState(false);
+  const [registrandoAtividade, setRegistrandoAtividade] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     if (!leadId && !cnpj) return;
     setLoading(true);
+    setLoadError(null);
     const fetcher = leadId ? getLeadById(leadId) : getLeadByCnpj(cnpj!);
     fetcher
       .then((l) => setLead(l))
-      .catch((e) => console.error(e))
+      .catch((error: unknown) => {
+        console.error("[lead-detail] falha ao carregar lead", error);
+        setLoadError("Não foi possível carregar este lead. Verifique sua conexão e permissão.");
+      })
       .finally(() => setLoading(false));
   }, [leadId, cnpj, open]);
 
@@ -81,7 +92,13 @@ export function LeadDetailSheet({ leadId, cnpj, open, onOpenChange }: Props) {
           </div>
         )}
 
-        {!loading && !lead && (
+        {!loading && loadError && (
+          <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            {loadError}
+          </div>
+        )}
+
+        {!loading && !loadError && !lead && (
           <div className="text-center py-10 text-muted-foreground">Lead não encontrado.</div>
         )}
 
@@ -320,6 +337,10 @@ export function LeadDetailSheet({ leadId, cnpj, open, onOpenChange }: Props) {
 
             <Separator />
             <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setRegistrandoAtividade(true)}>
+                <ClipboardPlus className="mr-2 h-4 w-4" aria-hidden="true" />
+                Registrar atividade
+              </Button>
               <Button variant="default" className="flex-1" onClick={() => setEditando(true)}>
                 Editar / avançar estágio
               </Button>
@@ -343,6 +364,21 @@ export function LeadDetailSheet({ leadId, cnpj, open, onOpenChange }: Props) {
         onSaved={(atualizado) => {
           setLead(atualizado);
           setEditando(false);
+        }}
+      />
+      <ActivityModal
+        lead={lead}
+        mode="manual"
+        open={registrandoAtividade}
+        onClose={() => setRegistrandoAtividade(false)}
+        userId={user?.id}
+        onDone={(atualizado) => {
+          setLead(atualizado);
+          setRegistrandoAtividade(false);
+          toast({
+            title: "Atividade registrada",
+            description: "O histórico foi atualizado sem avançar a cadência.",
+          });
         }}
       />
     </Sheet>

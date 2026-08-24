@@ -1,4 +1,5 @@
 import { test, expect, Page, ConsoleMessage } from "@playwright/test";
+import { qaPassword } from "./credentials";
 
 // Varredura de QA do CRM: entra com cada papel, visita todas as rotas dele e
 // registra tudo que der errado (console.error, exceção não tratada, HTTP >= 400,
@@ -6,7 +7,6 @@ import { test, expect, Page, ConsoleMessage } from "@playwright/test";
 // ficam na suíte de ações, sempre em leads QA-*.
 
 const BASE = process.env.QA_BASE_URL || "https://crm.simbiosedigital.com";
-const SENHA = process.env.QA_SENHA || "QaSimbiose2026!";
 
 type Achado = { rota: string; tipo: string; detalhe: string };
 
@@ -63,7 +63,7 @@ function instrumenta(page: Page, achados: Achado[], rotaAtual: () => string) {
 async function login(page: Page, email: string) {
   await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
   await page.getByLabel(/e-?mail/i).fill(email);
-  await page.getByLabel(/senha/i).fill(SENHA);
+  await page.getByLabel(/senha/i).fill(qaPassword());
   await page.getByRole("button", { name: /entrar/i }).click();
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 25000 });
 }
@@ -102,6 +102,46 @@ for (const [papel, cfg] of Object.entries(POR_PAPEL)) {
       }
       if (corpo.trim().length < 40) {
         achados.push({ rota: r, tipo: "tela-vazia", detalhe: `body com ${corpo.trim().length} chars` });
+      }
+
+      // Contratos visuais do Sales OS v2. São checagens somente leitura.
+      if (r === "/sdr") {
+        const funil = page.getByRole("tab", { name: "Funil SDR" });
+        await expect(funil).toBeVisible();
+        await funil.click();
+        await expect(page.getByText("A Contatar", { exact: true }).first()).toBeVisible();
+        await expect(page.getByRole("tab", { name: "Foco de Hoje" })).toBeVisible();
+      }
+      if (r === "/closer") {
+        await expect(page.getByLabel("Navegação horizontal da pipeline")).toBeVisible();
+        await expect(page.getByRole("button", { name: "Mostrar coluna anterior" })).toBeVisible();
+        await expect(page.getByRole("button", { name: "Mostrar próxima coluna" })).toBeVisible();
+        await expect(page.getByLabel("Ir para uma etapa da pipeline")).toBeVisible();
+      }
+      if (papel === "manager" && r === "/manager/cadencia") {
+        await page.getByRole("tab", { name: "Configuração versionada" }).click();
+        await expect(page.getByText("Cadências versionadas")).toBeVisible();
+        await expect(page.getByRole("button", { name: /nova cadência/i })).toBeVisible();
+        await expect(page.getByRole("button", { name: /publicar em shadow/i })).toBeVisible();
+      }
+      if (papel === "manager" && r === "/leads") {
+        const search = page.getByPlaceholder(/CNPJ, nome/i).first();
+        await search.fill("QA Beta");
+        await page.waitForTimeout(1200);
+        const row = page.locator("tr", { hasText: "QA Beta" }).first();
+        if (await row.count()) {
+          await row.click();
+          await expect(page.getByRole("button", { name: "Registrar atividade" }).first()).toBeVisible();
+          await page.keyboard.press("Escape");
+        } else {
+          await search.fill("");
+          await page.waitForTimeout(1200);
+          const firstRow = page.locator("tbody tr").first();
+          await expect(firstRow).toBeVisible();
+          await firstRow.click();
+          await expect(page.getByRole("button", { name: "Registrar atividade" }).first()).toBeVisible();
+          await page.keyboard.press("Escape");
+        }
       }
     }
 

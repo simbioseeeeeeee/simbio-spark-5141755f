@@ -43,17 +43,19 @@ export function PipelineCard({ lead, onClick, atividades, ultimoContatoEm, ultim
       className="rounded-lg border border-border bg-card p-3 hover:border-primary/30 transition-colors space-y-2 group"
     >
       <div className="flex items-start gap-2">
-        <div
+        <button
+          type="button"
           {...listeners}
           {...attributes}
-          className="cursor-grab active:cursor-grabbing pt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="min-h-6 min-w-6 cursor-grab rounded pt-0.5 text-muted-foreground opacity-60 transition-opacity hover:bg-muted hover:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
+          aria-label={`Arrastar ${lead.fantasia || lead.razao_social} para outra etapa`}
         >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
-        </div>
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
+          <GripVertical className="mx-auto h-4 w-4" aria-hidden="true" />
+        </button>
+        <button type="button" className="flex-1 min-w-0 cursor-pointer text-left" onClick={onClick}>
           <p className="font-medium text-sm truncate">{lead.fantasia || lead.razao_social}</p>
           <p className="text-xs text-muted-foreground truncate">{lead.bairro} · {lead.cidade || "—"}</p>
-        </div>
+        </button>
         {dias !== null && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -92,6 +94,7 @@ export function PipelineCard({ lead, onClick, atividades, ultimoContatoEm, ultim
                 rel="noopener noreferrer"
                 className="p-1 rounded hover:bg-success/10 text-success"
                 onClick={(e) => e.stopPropagation()}
+                aria-label={`Abrir WhatsApp de ${lead.fantasia || lead.razao_social}`}
               >
                 <MessageCircle className="h-3.5 w-3.5" />
               </a>
@@ -106,6 +109,7 @@ export function PipelineCard({ lead, onClick, atividades, ultimoContatoEm, ultim
                 href={`tel:${phone}`}
                 className="p-1 rounded hover:bg-primary/10 text-primary"
                 onClick={(e) => e.stopPropagation()}
+                aria-label={`Ligar para ${lead.fantasia || lead.razao_social}`}
               >
                 <Phone className="h-3.5 w-3.5" />
               </a>

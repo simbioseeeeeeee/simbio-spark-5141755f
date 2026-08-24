@@ -1,7 +1,7 @@
 import { test } from "@playwright/test";
+import { qaPassword } from "./credentials";
 
 const BASE = process.env.QA_BASE_URL || "https://crm.simbiosedigital.com";
-const SENHA = process.env.QA_SENHA || "QaSimbiose2026!";
 
 test("por que /leads redireciona", async ({ page }) => {
   test.setTimeout(180000);
@@ -21,7 +21,7 @@ test("por que /leads redireciona", async ({ page }) => {
   console.log("\n--- login ---");
   await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
   await page.getByLabel(/e-?mail/i).fill("qa-sdr@simbiosedigital.com");
-  await page.getByLabel(/senha/i).fill(SENHA);
+  await page.getByLabel(/senha/i).fill(qaPassword());
   await page.getByRole("button", { name: /entrar/i }).click();
   await page.waitForTimeout(6000);
   console.log("  url pós-login:", page.url());

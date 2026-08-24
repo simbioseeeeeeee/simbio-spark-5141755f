@@ -1,17 +1,17 @@
 import { test, expect, Page } from "@playwright/test";
+import { qaPassword } from "./credentials";
 
 // TESTES EXTERNOS REAIS — aprovados pelo CEO (21/08), executados UMA vez.
 // Alvo: lead QA-0006-externo, cujo telefone é o do próprio Guilherme.
 // Só roda com QA_EXTERNOS=1 pra não disparar de novo em execuções futuras.
 
 const BASE = process.env.QA_BASE_URL || "https://crm.simbiosedigital.com";
-const SENHA = process.env.QA_SENHA || "QaSimbiose2026!";
 const LIGADO = process.env.QA_EXTERNOS === "1";
 
 async function login(page: Page, email: string) {
   await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
   await page.getByLabel(/e-?mail/i).fill(email);
-  await page.getByLabel(/senha/i).fill(SENHA);
+  await page.getByLabel(/senha/i).fill(qaPassword());
   await page.getByRole("button", { name: /entrar/i }).click();
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 25000 });
   await page.waitForTimeout(1500);

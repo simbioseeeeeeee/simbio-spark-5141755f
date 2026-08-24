@@ -18,6 +18,8 @@ import { CidadeFilter, filterByCidade } from "@/components/CidadeFilter";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "@/hooks/use-toast";
 import { useLocation } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SdrPipeline } from "@/components/sdr/SdrPipeline";
 
 function MetricCard({ label, value, icon: Icon, color }: { label: string; value: number; icon: any; color: string }) {
   return (
@@ -275,7 +277,18 @@ export default function SdrWorkspace() {
       ) : isExplorer ? (
         <SdrExplorerView territorio={territorio} />
       ) : (
-        <SdrFocoView />
+        <Tabs defaultValue="foco" className="space-y-4">
+          <TabsList aria-label="Visões do workspace SDR">
+            <TabsTrigger value="foco">Foco de Hoje</TabsTrigger>
+            <TabsTrigger value="funil">Funil SDR</TabsTrigger>
+          </TabsList>
+          <TabsContent value="foco" className="space-y-4">
+            <SdrFocoView />
+          </TabsContent>
+          <TabsContent value="funil">
+            <SdrPipeline />
+          </TabsContent>
+        </Tabs>
       )}
     </AppLayout>
   );

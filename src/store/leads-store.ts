@@ -1,36 +1,16 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Lead, Socio, Atividade, PLAYBOOK_VERSION, type EstagioFunil } from "@/types/lead";
+import { Lead, Socio, Atividade, PLAYBOOK_VERSION, type EstagioFunil, type LeadStatus } from "@/types/lead";
 import { validatePipelineTransition, type TransitionContext } from "@/lib/sales-pipeline";
+import {
+  type ActivityDraft,
+  mapLegacyActivity,
+} from "@/lib/crm-domain";
 
 const PAGE_SIZE = 50;
 
-const ACTIVITY_TYPE_DB: Record<string, string> = {
-  WhatsApp: "whatsapp_out",
-  Ligação: "ligacao",
-  Email: "email_out",
-  Pesquisa: "nota",
-  Visita: "nota",
-};
-
-const ACTIVITY_RESULT_DB: Record<string, string> = {
-  Conectado: "sucesso",
-  Atendeu: "sucesso",
-  Respondeu: "sucesso",
-  "Não Atendeu": "sem_resposta",
-  "Caixa Postal": "sem_resposta",
-  "Sem Resposta": "sem_resposta",
-  "Agendou Reunião": "agendado",
-  Recusou: "recusa",
-  "Pesquisa Concluída": "sucesso",
-};
-
 export function mapActivityToDatabase(tipo: string, resultado: string) {
-  const tipoAtividade = ACTIVITY_TYPE_DB[tipo];
-  const resultadoAtividade = ACTIVITY_RESULT_DB[resultado];
-  if (!tipoAtividade || !resultadoAtividade) {
-    throw new Error("Tipo ou resultado de atividade fora do vocabulário comercial.");
-  }
-  return { tipoAtividade, resultadoAtividade };
+  const { activityType, activityResult } = mapLegacyActivity(tipo, resultado);
+  return { tipoAtividade: activityType, resultadoAtividade: activityResult };
 }
 
 // mdew guarda sócio em coluna flat (socio1_nome … socio5_email1). Ler row.socios
@@ -66,7 +46,7 @@ function normalizaEstagio(v: any): any {
   return ESTAGIO_ALIASES[String(v)] ?? v;
 }
 
-function rowToLead(row: any): Lead {
+export function rowToLead(row: any): Lead {
   return {
     // A tabela leads NAO tem coluna id — a PK e cnpj. Sem o fallback, todo card do
     // Kanban nascia com id undefined: o drag quebrava, atividades nao carregavam e o
@@ -111,6 +91,8 @@ function rowToLead(row: any): Lead {
     updated_at: row.updated_at ?? null,
     origem_lead: row.origem_lead ?? null,
     tipo_lead: row.tipo_lead ?? null,
+    responsavel_sdr: row.responsavel_sdr ?? null,
+    responsavel_closer: row.responsavel_closer ?? null,
     motivo_perda: row.motivo_perda ?? null,
     motivo_perda_detalhe: row.motivo_perda_detalhe ?? null,
     meeting_event_id: row.meeting_event_id ?? null,
@@ -131,7 +113,45 @@ function rowToLead(row: any): Lead {
     ganho_override_motivo: row.ganho_override_motivo ?? null,
     pipeline_review_required: row.pipeline_review_required ?? false,
     no_show_reagenda_tentativas: row.no_show_reagenda_tentativas ?? 0,
+    tentativas_followup: row.tentativas_followup ?? null,
+    data_ultimo_contato: row.data_ultimo_contato ?? null,
+    qtde_funcionarios: row.qtde_funcionarios ?? null,
+    cnae: row.cnae ?? null,
+    cnae_grupo: row.cnae_grupo ?? null,
+    cnae_setor: row.cnae_setor ?? null,
+    tipo_empresa: row.tipo_empresa ?? null,
   };
+}
+
+export const SDR_PIPELINE_STATUSES: readonly LeadStatus[] = [
+  "A Contatar",
+  "Prospectado",
+  "Em Qualificação",
+  "Qualificado",
+  "Reunião Agendada",
+];
+
+export async function getSdrPipelineLeads(): Promise<Lead[]> {
+  const { data, error } = await supabase
+    .from("leads")
+    .select("*")
+    .in("status_sdr", [...SDR_PIPELINE_STATUSES])
+    .order("updated_at", { ascending: false })
+    .limit(1_000);
+  if (error) throw error;
+  return (data || []).map(rowToLead);
+}
+
+export async function transitionSdrStatus(lead: Pick<Lead, "id" | "cnpj">, target: LeadStatus): Promise<Lead> {
+  const { data, error } = await supabase.rpc("transition_sdr_status" as never, {
+    p_lead_cnpj: lead.cnpj || lead.id,
+    p_target: target,
+    p_origin: "sdr_pipeline",
+  } as never);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("O status foi processado, mas o lead atualizado não foi retornado.");
+  return rowToLead(row);
 }
 
 // ─── Territory ───────────────────────────────────────────────
@@ -213,68 +233,39 @@ export async function registrarAtividade(
   }
 
   const mapped = mapActivityToDatabase(tipo, resultado);
+  return recordActivity(lead, {
+    type: mapped.tipoAtividade,
+    result: mapped.resultadoAtividade,
+    direction: "out",
+    note: nota,
+    occurredAt: new Date().toISOString(),
+  }, true, userId ? { requestedBy: userId } : undefined);
+}
 
-  const insertData: any = {
-    lead_cnpj: lead.cnpj || lead.id,
-    tipo_atividade: mapped.tipoAtividade,
-    resultado: mapped.resultadoAtividade,
-    nota: nota,
-    playbook_version: PLAYBOOK_VERSION,
-    origem: lead.origem_lead || null,
-    canal: mapped.tipoAtividade,
-    direcao: "out",
-    metadados: {
-      ui_tipo: tipo,
-      ui_resultado: resultado,
-      detalhe: nota || null,
+export async function recordActivity(
+  lead: Pick<Lead, "id" | "cnpj">,
+  draft: ActivityDraft,
+  advanceCadence: boolean,
+  context?: Record<string, unknown>,
+): Promise<Lead> {
+  const { data, error } = await supabase.rpc("record_crm_activity" as never, {
+    p_lead_cnpj: lead.cnpj || lead.id,
+    p_tipo: draft.type,
+    p_resultado: draft.result,
+    p_nota: draft.note || null,
+    p_direcao: draft.direction,
+    p_ocorrido_em: new Date(draft.occurredAt).toISOString(),
+    p_avancar_cadencia: advanceCadence,
+    p_contexto: {
+      origin: advanceCadence ? "cadence_queue" : "lead_profile",
+      ...context,
     },
-  };
-  insertData.created_by = userId || "crm";
+  } as never);
+  if (error) throw error;
 
-  const { error: actErr } = await supabase.from("atividades").insert(insertData);
-  if (actErr) throw actErr;
-
-  let newStatus = lead.status_sdr;
-  if (resultado === "Recusou") {
-    newStatus = "Desqualificado" as any;
-  } else if (newStatus === "A Contatar") {
-    newStatus = "Em Qualificação" as any;
-  }
-
-  const updateData: any = {
-    status_sdr: newStatus,
-    playbook_version: PLAYBOOK_VERSION,
-  };
-
-  // "Registrar e AVANÇAR CADÊNCIA": o botão prometia, mas nada avançava — o lead
-  // continuava na fila de hoje (get_cadencia_hoje pega data_proximo_passo <= now)
-  // como "Atrasado" pra sempre. Toque executado = conta a tentativa, carimba o
-  // último contato e empurra o próximo passo (régua 1/2/3/5/7 dias por tentativa).
-  // A régua automática do servidor pode reprogramar por cima — aqui o mínimo é
-  // tirar o lead da fila de HOJE. Recusa sai da régua de vez.
-  const tentativas = (Number((lead as any).tentativas_followup) || 0) + 1;
-  updateData.tentativas_followup = tentativas;
-  updateData.data_ultimo_contato = new Date().toISOString();
-  if (resultado === "Recusou") {
-    updateData.data_proximo_passo = null;
-  } else {
-    const DIAS_POR_TENTATIVA = [1, 2, 3, 5, 7];
-    const dias = DIAS_POR_TENTATIVA[Math.min(tentativas - 1, DIAS_POR_TENTATIVA.length - 1)];
-    const proximo = new Date();
-    proximo.setDate(proximo.getDate() + dias);
-    proximo.setHours(9, 0, 0, 0);
-    updateData.data_proximo_passo = proximo.toISOString();
-  }
-
-  const { data, error: updErr } = await supabase
-    .from("leads")
-    .update(updateData)
-    .eq("cnpj", lead.cnpj || lead.id)
-    .select()
-    .single();
-  if (updErr) throw updErr;
-
-  return rowToLead(data);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("A atividade foi processada, mas o lead atualizado não foi retornado.");
+  return rowToLead(row);
 }
 
 export async function getLeadAtividades(leadId: string, limit = 10): Promise<Atividade[]> {
@@ -468,24 +459,17 @@ export async function transitionLeadStage(
 
 export async function registrarReuniaoAgendada(
   lead: Pick<Lead, "id" | "cnpj">,
-  userId?: string,
+  _userId?: string,
   nota = "Status alterado manualmente para Reunião Agendada."
-): Promise<void> {
-  // atividades usa lead_cnpj/created_by (nao lead_id/sdr_id/owner_id) e os valores
-  // canonicos da casa sao tipo "reuniao" / resultado "agendado".
-  const { error } = await supabase.from("atividades").insert({
-    lead_cnpj: lead.cnpj || lead.id,
-    tipo_atividade: "reuniao",
-    resultado: "agendado",
-    nota,
-    created_by: userId || "crm",
-    playbook_version: PLAYBOOK_VERSION,
-    origem: "crm_manual",
-    canal: "reuniao",
-    direcao: "out",
-    metadados: { event_source: "calendar", detalhe: nota },
-  } as any);
+): Promise<Lead> {
+  const { data, error } = await supabase.rpc("confirm_existing_meeting" as never, {
+    p_lead_cnpj: lead.cnpj || lead.id,
+    p_nota: nota,
+  } as never);
   if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("O banco não confirmou a reunião.");
+  return rowToLead(row);
 }
 
 // ─── Status Counts ───────────────────────────────────────────

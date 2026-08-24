@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { ApiError } from "@/lib/api-error";
 
 // Backend de vendas (FastAPI no agents server). O CRM fala com ele para o que o
 // Supabase sozinho não faz: ligar pela Larissa (Vapi) e mandar WhatsApp pelo
@@ -10,16 +11,44 @@ export const API_BASE =
 export async function apiPost<T = unknown>(path: string, body: unknown): Promise<T> {
   const { data: sess } = await supabase.auth.getSession();
   const token = sess.session?.access_token;
-  if (!token) throw new Error("sessão expirada — faça login de novo");
+  if (!token) {
+    throw new ApiError("Sua sessão expirou. Entre novamente para continuar.", {
+      operation: path,
+      status: 401,
+    });
+  }
 
   const resp = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
   });
-  const payload = await resp.json().catch(() => ({}));
+  const payload: unknown = await resp.json().catch(() => ({}));
   if (!resp.ok) {
-    throw new Error((payload as any)?.detail || (payload as any)?.error || `HTTP ${resp.status}`);
+    const record = typeof payload === "object" && payload !== null
+      ? payload as Record<string, unknown>
+      : {};
+    const detail = typeof record.detail === "string"
+      ? record.detail
+      : typeof record.error === "string"
+        ? record.error
+        : `Falha HTTP ${resp.status}`;
+    const code = typeof record.code === "string" ? record.code : undefined;
+    const requestId = resp.headers.get("x-request-id") ||
+      (typeof record.request_id === "string" ? record.request_id : undefined);
+
+    console.error("[crm-api] operação falhou", {
+      operation: path,
+      status: resp.status,
+      code,
+      requestId,
+    });
+    throw new ApiError(detail, {
+      operation: path,
+      status: resp.status,
+      code,
+      requestId,
+    });
   }
   return payload as T;
 }

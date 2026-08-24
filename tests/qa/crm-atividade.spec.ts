@@ -1,17 +1,17 @@
 import { test, expect, Page } from "@playwright/test";
+import { qaPassword } from "./credentials";
 
 // Teste dirigido do que a varredura não alcançou: registrar atividade pelo
 // ActivityModal (abrindo pelo painel de tarefas, não pelo Foco de Hoje, que
 // filtra lead novo por desenho) e o Plano do Sprint.
 
 const BASE = process.env.QA_BASE_URL || "https://crm.simbiosedigital.com";
-const SENHA = process.env.QA_SENHA || "QaSimbiose2026!";
 const achados: string[] = [];
 
 async function login(page: Page, email: string) {
   await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
   await page.getByLabel(/e-?mail/i).fill(email);
-  await page.getByLabel(/senha/i).fill(SENHA);
+  await page.getByLabel(/senha/i).fill(qaPassword());
   await page.getByRole("button", { name: /entrar/i }).click();
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 25000 });
   await page.waitForTimeout(1500);

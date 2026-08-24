@@ -1,7 +1,7 @@
 import { test } from "@playwright/test";
+import { qaPassword } from "./credentials";
 
 const BASE = process.env.QA_BASE_URL || "https://crm.simbiosedigital.com";
-const SENHA = process.env.QA_SENHA || "QaSimbiose2026!";
 
 test("o que trava no /leads", async ({ page }) => {
   test.setTimeout(120000);
@@ -23,7 +23,7 @@ test("o que trava no /leads", async ({ page }) => {
 
   await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
   await page.getByLabel(/e-?mail/i).fill("qa-sdr@simbiosedigital.com");
-  await page.getByLabel(/senha/i).fill(SENHA);
+  await page.getByLabel(/senha/i).fill(qaPassword());
   await page.getByRole("button", { name: /entrar/i }).click();
   await page.waitForTimeout(5000);
 

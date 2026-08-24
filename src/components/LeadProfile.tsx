@@ -5,6 +5,7 @@ import {
   PLAYBOOK_VERSION, type MotivoPerda,
 } from "@/types/lead";
 import { LeadTimeline } from "./LeadTimeline";
+import { ActivityModal } from "./ActivityModal";
 import { updateLead, transitionLeadStage, registrarReuniaoAgendada, leadHasReuniaoActivity, getLeadsLastContact } from "@/store/leads-store";
 import { archiveLead } from "@/store/leads-overhaul-store";
 import { lastContactLabel, lastContactColor, activityEmoji, CANAL_CONFIG } from "@/lib/contact-helpers";
@@ -27,7 +28,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { ALLOWED_PIPELINE_TRANSITIONS, allowedSdrTargets, isPipelineStage, validateSdrTransition } from "@/lib/sales-pipeline";
-import { Building2, MapPin, Phone, PhoneCall, MessageCircle, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles, CheckCircle2, XCircle } from "lucide-react";
+import { Building2, MapPin, Phone, PhoneCall, MessageCircle, Mail, User, Search, Globe, Instagram, Megaphone, Save, Loader2, DollarSign, Calendar, Bot, Zap, Sparkles, CheckCircle2, XCircle, ClipboardPlus } from "lucide-react";
 import { ligarParaLead, enviarWhatsAppLead } from "@/lib/api";
 
 // calculateScore is now imported from types/lead
@@ -93,6 +94,8 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
   const [acionando, setAcionando] = useState<"ligar" | "wpp" | null>(null);
   const [compondoWpp, setCompondoWpp] = useState(false);
   const [agendando, setAgendando] = useState(false);
+  const [registrandoAtividade, setRegistrandoAtividade] = useState(false);
+  const [timelineVersion, setTimelineVersion] = useState(0);
   const [textoWpp, setTextoWpp] = useState("");
 
   async function acionarLigacao() {
@@ -264,8 +267,12 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
           managerOverrideReason: toSave.ganho_override_motivo,
         });
       }
-      const updated = await updateLead({
+      // A mudança para Reunião Agendada e sua atividade são confirmadas depois
+      // pela mesma RPC. Assim uma falha de auditoria nunca deixa o status salvo
+      // sem a atividade canônica (nem o inverso).
+      let updated = await updateLead({
         ...toSave,
+        status_sdr: shouldLogMeeting ? (lead?.status_sdr || "A Contatar") : toSave.status_sdr,
         estagio_funil: transitionResult?.estagio_funil ?? toSave.estagio_funil,
         proposta_enviada_em: transitionResult?.proposta_enviada_em ?? toSave.proposta_enviada_em,
         ganho_override_em: transitionResult?.ganho_override_em ?? toSave.ganho_override_em,
@@ -276,9 +283,13 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
 
       if (shouldLogMeeting) {
         try {
-          await registrarReuniaoAgendada(updated, user?.id, "Status alterado manualmente para Reunião Agendada.");
+          updated = await registrarReuniaoAgendada(
+            updated,
+            user?.id,
+            "Status alterado manualmente para Reunião Agendada.",
+          );
         } catch (meetingError: any) {
-          meetingLogError = meetingError.message || "Não foi possível contabilizar a reunião.";
+          meetingLogError = meetingError.message || "Não foi possível confirmar a reunião.";
         }
       }
 
@@ -353,6 +364,14 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
 
           {/* Ações diretas: a SDR trabalha o lead sem sair da ficha. */}
           <div className="mt-4 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setRegistrandoAtividade(true)}
+            >
+              <ClipboardPlus className="h-3.5 w-3.5" aria-hidden="true" />
+              Registrar atividade
+            </Button>
             <Button size="sm" variant="outline" className="gap-1.5" disabled={acionando !== null}
                     onClick={acionarLigacao}>
               {acionando === "ligar"
@@ -765,7 +784,7 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
         </div>
           </TabsContent>
           <TabsContent value="timeline" className="mt-0 p-6 overflow-y-auto max-h-[calc(100vh-220px)]">
-            <LeadTimeline leadId={current.id} />
+            <LeadTimeline leadId={current.id} refreshKey={timelineVersion} />
           </TabsContent>
           <TabsContent value="reuniao" className="mt-0">
             {current && (
@@ -812,6 +831,25 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
               };
               setForm(atualizado);
               onSaved(atualizado);
+            }}
+          />
+        )}
+        {registrandoAtividade && current && (
+          <ActivityModal
+            lead={current}
+            mode="manual"
+            open={registrandoAtividade}
+            onClose={() => setRegistrandoAtividade(false)}
+            userId={user?.id}
+            onDone={(updated) => {
+              setForm(updated);
+              onSaved(updated);
+              setTimelineVersion((version) => version + 1);
+              setRegistrandoAtividade(false);
+              toast({
+                title: "Atividade registrada",
+                description: "A timeline foi atualizada sem avançar a cadência.",
+              });
             }}
           />
         )}

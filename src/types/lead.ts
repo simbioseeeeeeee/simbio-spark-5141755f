@@ -44,9 +44,6 @@ export type MotivoPerda =
   | "outro";
 export type PaymentStatus = "nao_iniciado" | "pendente" | "pago" | "vencido" | "cancelado";
 
-export type TipoAtividade = "WhatsApp" | "Ligação" | "Email" | "Pesquisa" | "Visita";
-export type ResultadoAtividade = "Conectado" | "Atendeu" | "Respondeu" | "Não Atendeu" | "Caixa Postal" | "Sem Resposta" | "Agendou Reunião" | "Recusou" | "Pesquisa Concluída";
-
 export interface Socio {
   nome: string;
   telefone1?: string;
@@ -61,12 +58,17 @@ export type OrigemLead =
   | "bitrix_migrado"
   | "whatsapp_entrante"
   | "facebook_ads"
+  | "whatsapp_uchat"
+  | "instagram_manual"
+  | "live_simbiose"
+  | "evento_cimi360"
   | "teste"
   | "outros";
 
 export type TipoLead =
   | "imobiliaria_rf"
   | "programa_acelerador"
+  | "b2b_simbiose"
   | "lead_outros";
 
 export const ORIGEM_OPTIONS: { value: OrigemLead; label: string }[] = [
@@ -74,12 +76,17 @@ export const ORIGEM_OPTIONS: { value: OrigemLead; label: string }[] = [
   { value: "bitrix_migrado", label: "Bitrix Migrado" },
   { value: "whatsapp_entrante", label: "WhatsApp Entrante" },
   { value: "facebook_ads", label: "Facebook Ads" },
+  { value: "whatsapp_uchat", label: "WhatsApp UChat" },
+  { value: "instagram_manual", label: "Instagram manual" },
+  { value: "live_simbiose", label: "Live Simbiose" },
+  { value: "evento_cimi360", label: "Evento CIMI360" },
   { value: "teste", label: "Teste" },
 ];
 
 export const TIPO_OPTIONS: { value: TipoLead; label: string }[] = [
   { value: "imobiliaria_rf", label: "Imobiliária (RF)" },
   { value: "programa_acelerador", label: "Programa Acelerador" },
+  { value: "b2b_simbiose", label: "B2B Simbiose" },
   { value: "lead_outros", label: "Outros" },
 ];
 
@@ -88,6 +95,10 @@ export const ORIGEM_BADGE_CLASS: Record<string, string> = {
   bitrix_migrado: "bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/30",
   whatsapp_entrante: "bg-green-500/15 text-green-700 dark:text-green-300 border border-green-500/30",
   facebook_ads: "bg-pink-500/15 text-pink-700 dark:text-pink-300 border border-pink-500/30",
+  whatsapp_uchat: "bg-green-500/15 text-green-700 dark:text-green-300 border border-green-500/30",
+  instagram_manual: "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30",
+  live_simbiose: "bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-500/30",
+  evento_cimi360: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30",
   teste: "bg-muted text-muted-foreground border",
   outros: "bg-muted text-muted-foreground border",
 };
@@ -97,6 +108,10 @@ export const ORIGEM_LABEL: Record<string, string> = {
   bitrix_migrado: "Bitrix",
   whatsapp_entrante: "WhatsApp",
   facebook_ads: "Facebook Ads",
+  whatsapp_uchat: "WhatsApp UChat",
+  instagram_manual: "Instagram",
+  live_simbiose: "Live Simbiose",
+  evento_cimi360: "Evento CIMI360",
   teste: "Teste",
   outros: "Outros",
 };
@@ -104,6 +119,7 @@ export const ORIGEM_LABEL: Record<string, string> = {
 export const TIPO_LABEL: Record<string, string> = {
   imobiliaria_rf: "Imobiliária (RF)",
   programa_acelerador: "Acelerador",
+  b2b_simbiose: "B2B Simbiose",
   lead_outros: "Outros",
 };
 
@@ -237,15 +253,6 @@ export const MOTIVO_PERDA_LABEL: Record<MotivoPerda, string> = {
   desistencia: "Desistência",
   outro: "Outro",
 };
-
-export const TIPO_ATIVIDADE_OPTIONS: TipoAtividade[] = ["WhatsApp", "Ligação", "Email", "Pesquisa", "Visita"];
-
-export const RESULTADO_OPTIONS: ResultadoAtividade[] = [
-  "Conectado", "Atendeu", "Respondeu", "Não Atendeu",
-  // "Agendou Reunião" sai da lista de propósito: registrar reunião exige evento real
-  // na agenda (botão "Agendar reunião" na ficha). Escolher aqui só dava erro.
-  "Caixa Postal", "Sem Resposta", "Recusou", "Pesquisa Concluída",
-];
 
 export const STATUS_COLORS: Record<LeadStatus, string> = {
   "A Contatar": "bg-muted text-muted-foreground",

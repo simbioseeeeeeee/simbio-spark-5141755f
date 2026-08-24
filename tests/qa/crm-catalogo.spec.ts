@@ -1,12 +1,12 @@
 import { test, expect, Page } from "@playwright/test";
+import { qaPassword } from "./credentials";
 
 const BASE = process.env.QA_BASE_URL || "https://crm.simbiosedigital.com";
-const SENHA = process.env.QA_SENHA || "QaSimbiose2026!";
 
 async function login(page: Page, email: string) {
   await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
   await page.getByLabel(/e-?mail/i).fill(email);
-  await page.getByLabel(/senha/i).fill(SENHA);
+  await page.getByLabel(/senha/i).fill(qaPassword());
   await page.getByRole("button", { name: /entrar/i }).click();
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 25000 });
   await page.waitForTimeout(2000);

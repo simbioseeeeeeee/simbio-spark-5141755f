@@ -1,16 +1,16 @@
 import { useState } from "react";
-import { Lead, TIPO_ATIVIDADE_OPTIONS, RESULTADO_OPTIONS, TipoAtividade, ResultadoAtividade } from "@/types/lead";
-import { registrarAtividade } from "@/store/leads-store";
+import { Lead } from "@/types/lead";
+import { recordActivity } from "@/store/leads-store";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Loader2, Phone, MessageSquare, Building2, MapPin, Mail, User, Globe, Instagram, Megaphone, Bot, Zap, Search } from "lucide-react";
+import { Phone, MessageSquare, Building2, MapPin, Mail, User, Globe, Instagram, Megaphone, Bot, Zap, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { CopyButton } from "./CopyButton";
+import { ActivityForm } from "@/components/activities/ActivityForm";
+import type { ActivityDraft } from "@/lib/crm-domain";
+import { errorMessage } from "@/lib/api-error";
+import type { LucideIcon } from "lucide-react";
 
 interface Props {
   lead: Lead | null;
@@ -18,6 +18,7 @@ interface Props {
   onClose: () => void;
   onDone: (updated: Lead) => void;
   userId?: string;
+  mode?: "manual" | "cadence";
 }
 
 function PhoneLink({ phone, isCelular }: { phone: string; isCelular?: boolean }) {
@@ -45,7 +46,7 @@ function ScoreBadge({ score }: { score: number | null }) {
   return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold border ${color}`}>Pesquisa digital {score}/100</span>;
 }
 
-function QualBadge({ label, active, icon: Icon }: { label: string; active: boolean; icon: any }) {
+function QualBadge({ label, active, icon: Icon }: { label: string; active: boolean; icon: LucideIcon }) {
   return (
     <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md ${active ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
       <Icon className="h-3 w-3" />
@@ -54,10 +55,7 @@ function QualBadge({ label, active, icon: Icon }: { label: string; active: boole
   );
 }
 
-export function ActivityModal({ lead, open, onClose, onDone, userId }: Props) {
-  const [tipo, setTipo] = useState<string>("WhatsApp");
-  const [resultado, setResultado] = useState<string>("");
-  const [nota, setNota] = useState("");
+export function ActivityModal({ lead, open, onClose, onDone, userId, mode = "cadence" }: Props) {
   const [saving, setSaving] = useState(false);
 
   if (!lead) return null;
@@ -65,19 +63,19 @@ export function ActivityModal({ lead, open, onClose, onDone, userId }: Props) {
   const isResearchStep = !lead.pesquisa_realizada;
   const searchName = lead.fantasia || lead.razao_social;
 
-  const handleSubmit = async () => {
-    if (!resultado) {
-      toast({ title: "Selecione o resultado", variant: "destructive" });
-      return;
-    }
+  const handleSubmit = async (draft: ActivityDraft) => {
     setSaving(true);
     try {
-      const updated = await registrarAtividade(lead, tipo, resultado, nota, userId);
-      setResultado("");
-      setNota("");
+      const updated = await recordActivity(lead, draft, mode === "cadence", {
+        requestedBy: userId,
+      });
       onDone(updated);
-    } catch (err: any) {
-      toast({ title: "Erro ao registrar", description: err.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({
+        title: "Não foi possível registrar a atividade",
+        description: errorMessage(error, "A gravação falhou. Atualize a ficha e tente novamente."),
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -217,7 +215,9 @@ export function ActivityModal({ lead, open, onClose, onDone, userId }: Props) {
 
           {/* Right: Activity Form */}
           <div className="p-4 space-y-4">
-            <h3 className="text-sm font-semibold">Registrar Atividade</h3>
+            <h3 className="text-sm font-semibold">
+              {mode === "cadence" ? "Registrar contato da cadência" : "Registrar atividade"}
+            </h3>
 
             {/* Quick Actions */}
             <div className="flex gap-2">
@@ -237,42 +237,11 @@ export function ActivityModal({ lead, open, onClose, onDone, userId }: Props) {
               )}
             </div>
 
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Tipo de Atividade</Label>
-                <Select value={tipo} onValueChange={setTipo}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {TIPO_ATIVIDADE_OPTIONS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs">Resultado</Label>
-                <Select value={resultado} onValueChange={setResultado}>
-                  <SelectTrigger><SelectValue placeholder="O que aconteceu?" /></SelectTrigger>
-                  <SelectContent>
-                    {RESULTADO_OPTIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs">Nota (opcional)</Label>
-                <Textarea
-                  rows={2}
-                  placeholder="Detalhes da interação..."
-                  value={nota}
-                  onChange={(e) => setNota(e.target.value)}
-                />
-              </div>
-
-              <Button onClick={handleSubmit} className="w-full" disabled={saving || !resultado}>
-                {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                {saving ? "Salvando..." : "Registrar e Avançar Cadência"}
-              </Button>
-            </div>
+            <ActivityForm
+              advanceCadence={mode === "cadence"}
+              saving={saving}
+              onSubmit={handleSubmit}
+            />
           </div>
         </div>
       </DialogContent>

@@ -19,7 +19,7 @@ import { NewLeadModal } from "@/components/NewLeadModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -1119,6 +1119,7 @@ export default function ManagerWorkspace() {
 
 // Simplified cadencia view for Manager
 import { ActivityModal } from "@/components/ActivityModal";
+import { CadenceManager } from "@/components/manager/CadenceManager";
 
 import { Crosshair, Search, Phone, MessageSquare, Bot } from "lucide-react";
 
@@ -1155,7 +1156,12 @@ function SdrCadenciaForManager() {
   };
 
   return (
-    <>
+    <Tabs defaultValue="fila" className="space-y-4">
+      <TabsList aria-label="Operação e configuração da cadência">
+        <TabsTrigger value="fila">Fila SDR</TabsTrigger>
+        <TabsTrigger value="configuracao">Configuração versionada</TabsTrigger>
+      </TabsList>
+      <TabsContent value="fila" className="space-y-4">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-primary/10 text-primary"><Search className="h-5 w-5" /></div>
@@ -1226,8 +1232,12 @@ function SdrCadenciaForManager() {
         </div>
       )}
 
-      <LeadProfile lead={selectedLead} open={!!selectedLead} onClose={() => setSelectedLead(null)} onSaved={(u) => setSelectedLead(u)} />
-      <ActivityModal lead={activityLead} open={!!activityLead} onClose={() => setActivityLead(null)} onDone={handleActivityDone} userId={user?.id} />
-    </>
+        <LeadProfile lead={selectedLead} open={!!selectedLead} onClose={() => setSelectedLead(null)} onSaved={(u) => setSelectedLead(u)} />
+        <ActivityModal lead={activityLead} open={!!activityLead} onClose={() => setActivityLead(null)} onDone={handleActivityDone} userId={user?.id} mode="cadence" />
+      </TabsContent>
+      <TabsContent value="configuracao">
+        <CadenceManager />
+      </TabsContent>
+    </Tabs>
   );
 }
