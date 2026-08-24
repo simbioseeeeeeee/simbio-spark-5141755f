@@ -31,5 +31,5 @@ test("criativos cruza estado atual e historico da Meta sem expor credencial", as
   await expect(page.getByText("Já veiculou").first()).toBeVisible();
 
   await page.getByRole("tab", { name: /Fila interna/ }).click();
-  await expect(page.getByText("Fila interna de aprovação")).toBeVisible();
+  await expect(page.getByText("Fila interna de aprovação", { exact: true })).toBeVisible();
 });
