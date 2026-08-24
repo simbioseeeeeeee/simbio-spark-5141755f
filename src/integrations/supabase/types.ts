@@ -113,6 +113,26 @@ type ServerControlledLeadField =
 
 export type LeadDatabaseUpdate = Partial<Omit<LeadDatabaseRow, "cnpj" | ServerControlledLeadField>>
 
+export type CreativeDatabaseRow = {
+  id: number
+  peca: string
+  lote: string | null
+  trilha: string
+  angulo: string
+  destino: string | null
+  preview_url: string | null
+  endcard: string | null
+  fala: string | null
+  anuncio_texto: string | null
+  duracao_seg: number | null
+  status: string
+  nota: string | null
+  aprovado_por: string | null
+  aprovado_em: string | null
+  no_ar: boolean
+  atualizado_em: string | null
+}
+
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -179,6 +199,12 @@ export type Database = {
           status_vapi?: string | null
           tipo_atividade?: string
         }
+        Relationships: []
+      }
+      criativos: {
+        Row: CreativeDatabaseRow
+        Insert: Partial<Omit<CreativeDatabaseRow, "id">> & { peca: string; trilha: string; angulo: string }
+        Update: Partial<Omit<CreativeDatabaseRow, "id">>
         Relationships: []
       }
       kpi_daily_snapshots: {

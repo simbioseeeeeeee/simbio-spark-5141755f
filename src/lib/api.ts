@@ -8,7 +8,7 @@ import { ApiError } from "@/lib/api-error";
 export const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined) ?? "https://api.simbiosedigital.com";
 
-export async function apiPost<T = unknown>(path: string, body: unknown): Promise<T> {
+async function sessionToken(path: string) {
   const { data: sess } = await supabase.auth.getSession();
   const token = sess.session?.access_token;
   if (!token) {
@@ -17,12 +17,10 @@ export async function apiPost<T = unknown>(path: string, body: unknown): Promise
       status: 401,
     });
   }
+  return token;
+}
 
-  const resp = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify(body),
-  });
+async function responsePayload<T>(resp: Response, path: string): Promise<T> {
   const payload: unknown = await resp.json().catch(() => ({}));
   if (!resp.ok) {
     const record = typeof payload === "object" && payload !== null
@@ -51,6 +49,25 @@ export async function apiPost<T = unknown>(path: string, body: unknown): Promise
     });
   }
   return payload as T;
+}
+
+export async function apiGet<T = unknown>(path: string): Promise<T> {
+  const token = await sessionToken(path);
+  const resp = await fetch(`${API_BASE}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return responsePayload<T>(resp, path);
+}
+
+export async function apiPost<T = unknown>(path: string, body: unknown): Promise<T> {
+  const token = await sessionToken(path);
+
+  const resp = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  return responsePayload<T>(resp, path);
 }
 
 /** Manda a Larissa (IA) ligar para o lead agora. */
