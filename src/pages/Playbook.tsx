@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/hooks/use-toast";
-import { BookOpen, AlertTriangle, Ban, Pencil, Check, X } from "lucide-react";
+import { BookOpen, AlertTriangle, Ban, Pencil, Check, X, Copy, Megaphone } from "lucide-react";
 import {
   listarObjecoes, salvarObjecao, statsObjecoes, listarConfig,
   CATEGORIA_LABEL, ROTEIRO_BLOCOS, NUNCA_ENTRA,
@@ -52,6 +52,16 @@ export default function Playbook() {
 
   const statPor = useMemo(() => new Map(stats.map((s) => [s.id, s])), [stats]);
   const pendentes = config.filter((c) => !c.definido);
+  const pitch = useMemo(() => config
+    .filter((c) => c.chave.startsWith("pitch_"))
+    .map((c) => ({ chave: c.chave, ordem: Number((c as any).valor?.ordem ?? 99),
+                   titulo: String((c as any).valor?.titulo ?? c.chave), texto: String((c as any).valor?.texto ?? "") }))
+    .filter((p) => p.texto)
+    .sort((a, b) => a.ordem - b.ordem), [config]);
+  const copiar = async (texto: string) => {
+    try { await navigator.clipboard.writeText(texto); toast({ title: "Copiado" }); }
+    catch { toast({ title: "Não consegui copiar — selecione o texto e copie", variant: "destructive" }); }
+  };
 
   async function salvarEdicao(o: Objecao) {
     try {
@@ -80,6 +90,35 @@ export default function Playbook() {
           <Badge variant="secondary">{PLAYBOOK_VERSION}</Badge>
           <span className="text-xs text-muted-foreground">operação de vendas · matriz de objeções · roteiro de 45 min · regras</span>
         </div>
+
+        {/* pitch rápido — "o que a Simbiose faz" (playbook_config pitch_*; doc: docs/comercial/pitch-rapido-sdr.md) */}
+        {pitch.length > 0 && (
+          <Card className="border-primary/40">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Megaphone className="h-4 w-4 text-primary" />
+                O que a Simbiose faz — pitch rápido da SDR
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Pra responder em segundos quem pergunta "o que vocês fazem?" ou "nem lembro qual anúncio cliquei".
+                Clique em copiar e cole no WhatsApp.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {pitch.map((p) => (
+                <div key={p.chave} className="rounded-md border bg-muted/30 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <b className="text-sm">{p.titulo}</b>
+                    <Button variant="ghost" size="sm" className="h-7 shrink-0 gap-1 text-xs" onClick={() => copiar(p.texto)}>
+                      <Copy className="h-3.5 w-3.5" /> copiar
+                    </Button>
+                  </div>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{p.texto}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {pendentes.length > 0 && (
           <Card className="border-amber-400/60">
