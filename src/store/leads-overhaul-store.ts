@@ -179,11 +179,11 @@ function applyCommonFilters(query: any, q: OverhaulQuery) {
     if (digits.length >= 6) {
       const sd = `%${digits}%`;
       query = query.or(
-        `razao_social.ilike.${s},fantasia.ilike.${s},cnpj.ilike.${s},cnpj.ilike.${sd},celular1.ilike.${s},celular1.ilike.${sd},email1.ilike.${s}`
+        `razao_social.ilike.${s},fantasia.ilike.${s},contato_nome.ilike.${s},cnpj.ilike.${s},cnpj.ilike.${sd},celular1.ilike.${s},celular1.ilike.${sd},email1.ilike.${s}`
       );
     } else {
       query = query.or(
-        `razao_social.ilike.${s},fantasia.ilike.${s},cnpj.ilike.${s},celular1.ilike.${s},email1.ilike.${s}`
+        `razao_social.ilike.${s},fantasia.ilike.${s},contato_nome.ilike.${s},cnpj.ilike.${s},celular1.ilike.${s},email1.ilike.${s}`
       );
     }
   }
