@@ -11,8 +11,8 @@
 --   • razão social aceita o nome da pessoa quando não se sabe a empresa.
 
 CREATE OR REPLACE FUNCTION public.crm_create_manual_lead(
-  p_cnpj text,
-  p_razao_social text,
+  p_cnpj text DEFAULT NULL,
+  p_razao_social text DEFAULT NULL,
   p_fantasia text DEFAULT NULL,
   p_contato_nome text DEFAULT NULL,
   p_celular text DEFAULT NULL,

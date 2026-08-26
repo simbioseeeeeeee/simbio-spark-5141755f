@@ -70,7 +70,7 @@ export function NewLeadModal({ onCreated }: Props) {
     setSaving(true);
     try {
       const { data, error } = await supabase.rpc("crm_create_manual_lead", {
-        p_cnpj: cnpj || undefined,
+        p_cnpj: cnpj,  // string vazia = sem CNPJ (undefined faria o PostgREST não achar a função)
         p_razao_social: nomeEmpresa,
         p_fantasia: form.fantasia.trim() || undefined,
         p_contato_nome: form.contato_nome.trim() || undefined,
