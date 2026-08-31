@@ -21,6 +21,7 @@ test("painel comercial, fila do Guilherme e MRR da pipeline", async ({ page }) =
   await expect(page.getByText("MRR em propostas", { exact: true })).toBeVisible();
   await expect(page.getByText("MRR aprovado", { exact: true })).toBeVisible();
   await expect(page.getByText("MRR contratado atual", { exact: true })).toBeVisible();
+  await expect(page.getByText("Custo por oportunidade qualificada", { exact: true })).toBeVisible();
   await expect(page.getByText(/R\$\s*3\.000,00/).first()).toBeVisible();
   await expect(page.getByText("Meta sincronizada", { exact: true })).toBeVisible();
   await page.getByRole("tab", { name: "Custos por campanha", exact: true }).click();

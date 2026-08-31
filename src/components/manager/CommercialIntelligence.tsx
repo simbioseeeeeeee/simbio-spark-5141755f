@@ -24,6 +24,7 @@ type Dashboard = {
   origins: { origin: OrigemComercial; leads_created: number; qualified: number; closed: number }[];
 };
 type PendingMrr = { cnpj: string; fantasia: string | null; razao_social: string | null; estagio_funil: string | null };
+type QualifiedMeeting = { cnpj: string; origem_comercial: OrigemComercial | null; reuniao_realizada_em: string };
 
 const PROPOSAL_STAGES = ["Proposta Enviada", "Em Negociação", "Aguardando Aceite", "Aguardando Pagamento"];
 const MRR_STAGES = [...PROPOSAL_STAGES, "Fechado Ganho"];
@@ -43,6 +44,7 @@ function Metric({ label, value, note, emphasis = false }: { label: string; value
 export function CommercialIntelligence({ period }: { period: number }) {
   const [data, setData] = useState<Dashboard | null>(null);
   const [media, setMedia] = useState<MidiaLinha[]>([]);
+  const [qualifiedMeetings, setQualifiedMeetings] = useState<QualifiedMeeting[]>([]);
   const [pendingMrr, setPendingMrr] = useState<PendingMrr[]>([]);
   const [mrrValues, setMrrValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -53,15 +55,18 @@ export function CommercialIntelligence({ period }: { period: number }) {
   const load = useCallback(async () => {
     setLoading(true);
     const from = brtDate(period - 1);
-    const [dashboardResponse, mediaResponse, pendingResponse] = await Promise.all([
+    const [dashboardResponse, mediaResponse, qualifiedResponse, pendingResponse] = await Promise.all([
       (supabase.rpc as any)("crm_commercial_dashboard", { p_days: period }),
       supabase.from("vw_simbiose_midia_diaria" as any).select("*").gte("dia", from).lte("dia", brtDate()).order("dia"),
+      supabase.from("leads").select("cnpj,origem_comercial,reuniao_realizada_em").is("deleted_at", null).gte("reuniao_realizada_em", `${from}T00:00:00-03:00`).lte("reuniao_realizada_em", `${brtDate()}T23:59:59-03:00`),
       supabase.from("leads").select("cnpj,fantasia,razao_social,estagio_funil").is("deleted_at", null).in("estagio_funil", MRR_STAGES).is("mrr_proposta", null).order("stage_changed_at", { ascending: false }).limit(20),
     ]);
     if (dashboardResponse.error) toast({ title: "Painel comercial indisponível", description: dashboardResponse.error.message, variant: "destructive" });
     else setData(dashboardResponse.data as Dashboard);
     if (mediaResponse.error) toast({ title: "Custos de mídia indisponíveis", description: mediaResponse.error.message, variant: "destructive" });
     else setMedia(((mediaResponse.data as any[]) || []).map((row) => ({ ...row, gasto: Number(row.gasto || 0), leads: Number(row.leads || 0), impressoes: Number(row.impressoes || 0), cliques: Number(row.cliques || 0) })) as MidiaLinha[]);
+    if (qualifiedResponse.error) toast({ title: "Reuniões realizadas indisponíveis", description: qualifiedResponse.error.message, variant: "destructive" });
+    else setQualifiedMeetings((qualifiedResponse.data || []) as QualifiedMeeting[]);
     if (!pendingResponse.error) setPendingMrr((pendingResponse.data || []) as PendingMrr[]);
     setLoading(false);
   }, [period]);
@@ -79,6 +84,15 @@ export function CommercialIntelligence({ period }: { period: number }) {
     }
     return { spend, leads, campaigns: [...campaigns.values()].sort((a, b) => b.spend - a.spend) };
   }, [media]);
+
+  const qualifiedByOrigin = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const meeting of qualifiedMeetings) {
+      const origin = meeting.origem_comercial || "outros";
+      counts.set(origin, (counts.get(origin) || 0) + 1);
+    }
+    return counts;
+  }, [qualifiedMeetings]);
 
   const addInvestment = async () => {
     if (!investment.campaign_name.trim() || !investment.amount || Number(investment.amount) < 0) {
@@ -109,7 +123,8 @@ export function CommercialIntelligence({ period }: { period: number }) {
   const contractedMrr = data.stages.filter((row) => row.stage === "Fechado Ganho").reduce((sum, row) => sum + Number(row.mrr || 0), 0);
   const totalSpend = mediaSummary.spend + Number(s.spend || 0);
   const costPerLead = mediaSummary.leads > 0 ? mediaSummary.spend / mediaSummary.leads : null;
-  const costPerQualified = s.qualified > 0 ? totalSpend / s.qualified : null;
+  const qualified = qualifiedMeetings.length;
+  const costPerQualified = qualified > 0 ? totalSpend / qualified : null;
   const costPerClose = s.closed > 0 ? totalSpend / s.closed : null;
   const realizedPayback = s.closed_mrr > 0 ? totalSpend / s.closed_mrr : null;
   const projectedPayback = s.approved_pipeline > 0 ? totalSpend / (s.approved_pipeline * 0.8) : null;
@@ -125,7 +140,7 @@ export function CommercialIntelligence({ period }: { period: number }) {
           <Metric label="Projeção a 80%" value={money(s.approved_pipeline * 0.8)} note="Pipeline aprovado × 80%" emphasis />
           <Metric label="MRR contratado atual" value={money(contractedMrr)} note={`${money(s.closed_mrr)} fechado no período`} emphasis />
           <Metric label="Custo por lead de mídia" value={money(costPerLead)} note={`${mediaSummary.leads} lead(s) atribuídos pela Meta`} />
-          <Metric label="Custo por qualificado" value={money(costPerQualified)} note={`${s.qualified} oportunidade(s) no período`} />
+          <Metric label="Custo por oportunidade qualificada" value={money(costPerQualified)} note={`${qualified} reunião(ões) realizada(s) no período`} />
           <Metric label="Custo por fechamento" value={money(costPerClose)} />
           <Metric label="Payback realizado" value={realizedPayback == null ? "—" : `${realizedPayback.toFixed(1)} meses`} />
           <Metric label="Payback projetado" value={projectedPayback == null ? "—" : `${projectedPayback.toFixed(1)} meses`} note="Sobre a projeção de 80%" />
@@ -135,7 +150,7 @@ export function CommercialIntelligence({ period }: { period: number }) {
 
         <Tabs defaultValue="summary">
           <TabsList><TabsTrigger value="summary">Resumo</TabsTrigger><TabsTrigger value="pipeline">Pipeline e MRR</TabsTrigger><TabsTrigger value="costs">Custos por campanha</TabsTrigger><TabsTrigger value="internal">Operação interna</TabsTrigger></TabsList>
-          <TabsContent value="summary" className="space-y-4 pt-3"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Metric label="Leads criados" value={number(s.leads_created)} /><Metric label="Reuniões agendadas" value={number(s.meetings_scheduled)} /><Metric label="Reuniões realizadas" value={number(s.meetings_held)} note={`${s.no_shows} no-show(s)`} /><Metric label="Fechamentos" value={number(s.closed)} /></div><Table><TableHeader><TableRow><TableHead>Origem</TableHead><TableHead className="text-right">Leads</TableHead><TableHead className="text-right">Qualificados</TableHead><TableHead className="text-right">Fechamentos</TableHead></TableRow></TableHeader><TableBody>{data.origins.map((row) => <TableRow key={row.origin}><TableCell>{ORIGEM_COMERCIAL_LABEL[row.origin] || row.origin}</TableCell><TableCell className="text-right">{row.leads_created}</TableCell><TableCell className="text-right">{row.qualified}</TableCell><TableCell className="text-right">{row.closed}</TableCell></TableRow>)}</TableBody></Table></TabsContent>
+          <TabsContent value="summary" className="space-y-4 pt-3"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Metric label="Leads criados" value={number(s.leads_created)} /><Metric label="Reuniões agendadas" value={number(s.meetings_scheduled)} /><Metric label="Reuniões realizadas" value={number(qualified)} note={`${s.no_shows} no-show(s)`} /><Metric label="Fechamentos" value={number(s.closed)} /></div><Table><TableHeader><TableRow><TableHead>Origem</TableHead><TableHead className="text-right">Leads</TableHead><TableHead className="text-right">Qualificados</TableHead><TableHead className="text-right">Fechamentos</TableHead></TableRow></TableHeader><TableBody>{data.origins.map((row) => <TableRow key={row.origin}><TableCell>{ORIGEM_COMERCIAL_LABEL[row.origin] || row.origin}</TableCell><TableCell className="text-right">{row.leads_created}</TableCell><TableCell className="text-right">{qualifiedByOrigin.get(row.origin) || 0}</TableCell><TableCell className="text-right">{row.closed}</TableCell></TableRow>)}</TableBody></Table></TabsContent>
           <TabsContent value="pipeline" className="grid gap-4 pt-3 lg:grid-cols-2"><Table><TableHeader><TableRow><TableHead>Etapa atual</TableHead><TableHead className="text-right">Leads</TableHead><TableHead className="text-right">MRR</TableHead></TableRow></TableHeader><TableBody>{data.stages.map((row) => <TableRow key={row.stage}><TableCell>{estagioLabel(row.stage)}</TableCell><TableCell className="text-right">{row.leads}</TableCell><TableCell className="text-right font-medium">{money(row.mrr)}</TableCell></TableRow>)}</TableBody></Table><Table><TableHeader><TableRow><TableHead>Temperatura</TableHead><TableHead className="text-right">Leads ativos</TableHead><TableHead className="text-right">MRR</TableHead></TableRow></TableHeader><TableBody>{data.temperatures.map((row) => <TableRow key={row.temperature}><TableCell className="capitalize">{row.temperature.replace("sem_classificar", "Sem classificar")}</TableCell><TableCell className="text-right">{row.leads}</TableCell><TableCell className="text-right">{money(row.mrr)}</TableCell></TableRow>)}</TableBody></Table></TabsContent>
           <TabsContent value="costs" className="space-y-4 pt-3"><Table><TableHeader><TableRow><TableHead>Campanha Meta</TableHead><TableHead className="text-right">Investimento</TableHead><TableHead className="text-right">Leads</TableHead><TableHead className="text-right">CPL</TableHead></TableRow></TableHeader><TableBody>{mediaSummary.campaigns.map((campaign) => <TableRow key={campaign.name}><TableCell className="max-w-[380px] truncate" title={campaign.name}>{campaign.name}</TableCell><TableCell className="text-right">{money(campaign.spend)}</TableCell><TableCell className="text-right">{campaign.leads}</TableCell><TableCell className="text-right">{money(campaign.leads > 0 ? campaign.spend / campaign.leads : null)}</TableCell></TableRow>)}</TableBody></Table>{mediaSummary.campaigns.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma entrega de mídia no período.</p>}<div className="rounded-md border p-3"><p className="mb-1 text-sm font-medium">Adicionar custo fora da Meta</p><p className="mb-3 text-xs text-muted-foreground">A mídia Meta já entra automaticamente. Use apenas para evento, ferramenta, produção ou outro custo não importado.</p><div className="grid gap-3 md:grid-cols-5"><div><Label>Início</Label><Input type="date" value={investment.period_start} onChange={(e) => setInvestment({ ...investment, period_start: e.target.value })} /></div><div><Label>Fim</Label><Input type="date" value={investment.period_end} onChange={(e) => setInvestment({ ...investment, period_end: e.target.value })} /></div><div><Label>Origem</Label><Select value={investment.origem_comercial} onValueChange={(v) => setInvestment({ ...investment, origem_comercial: v as OrigemComercial })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{(Object.entries(ORIGEM_COMERCIAL_LABEL) as [OrigemComercial, string][]).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div><div><Label>Descrição</Label><Input value={investment.campaign_name} onChange={(e) => setInvestment({ ...investment, campaign_name: e.target.value })} /></div><div><Label>Custo (R$)</Label><div className="flex gap-2"><Input type="number" min={0} step="0.01" value={investment.amount} onChange={(e) => setInvestment({ ...investment, amount: e.target.value })} /><Button size="icon" onClick={addInvestment} disabled={saving === "investment"}>{saving === "investment" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}</Button></div></div></div></div></TabsContent>
           <TabsContent value="internal" className="grid gap-3 pt-3 sm:grid-cols-2 lg:grid-cols-4"><Metric label="Aguardando nossa resposta" value={s.waiting_replies} note="Número do Guilherme" /><Metric label="Conversas fora do CRM" value={s.outside_crm} note="Número do Guilherme" /><Metric label="Gasto Meta" value={money(mediaSummary.spend)} /><Metric label="Custos extras" value={money(s.spend)} /></TabsContent>
