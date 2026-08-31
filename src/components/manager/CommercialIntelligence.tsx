@@ -106,6 +106,7 @@ export function CommercialIntelligence({ period }: { period: number }) {
   if (!data) return null;
   const s = data.summary;
   const pipelineMrr = data.stages.filter((row) => PROPOSAL_STAGES.includes(row.stage)).reduce((sum, row) => sum + Number(row.mrr || 0), 0);
+  const contractedMrr = data.stages.filter((row) => row.stage === "Fechado Ganho").reduce((sum, row) => sum + Number(row.mrr || 0), 0);
   const totalSpend = mediaSummary.spend + Number(s.spend || 0);
   const costPerLead = mediaSummary.leads > 0 ? mediaSummary.spend / mediaSummary.leads : null;
   const costPerQualified = s.qualified > 0 ? totalSpend / s.qualified : null;
@@ -122,7 +123,7 @@ export function CommercialIntelligence({ period }: { period: number }) {
           <Metric label="MRR em propostas" value={money(pipelineMrr)} note="Propostas realizadas e em negociação" emphasis />
           <Metric label="MRR aprovado" value={money(s.approved_pipeline)} note="Sinal verde, antes do fechamento" emphasis />
           <Metric label="Projeção a 80%" value={money(s.approved_pipeline * 0.8)} note="Pipeline aprovado × 80%" emphasis />
-          <Metric label="MRR fechado" value={money(s.closed_mrr)} note={`${s.closed} fechamento(s) no período`} emphasis />
+          <Metric label="MRR contratado atual" value={money(contractedMrr)} note={`${money(s.closed_mrr)} fechado no período`} emphasis />
           <Metric label="Custo por lead de mídia" value={money(costPerLead)} note={`${mediaSummary.leads} lead(s) atribuídos pela Meta`} />
           <Metric label="Custo por qualificado" value={money(costPerQualified)} note={`${s.qualified} oportunidade(s) no período`} />
           <Metric label="Custo por fechamento" value={money(costPerClose)} />
