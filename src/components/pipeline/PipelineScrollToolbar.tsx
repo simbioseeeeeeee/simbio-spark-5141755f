@@ -6,11 +6,12 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 type Props = {
   containerRef: RefObject<HTMLDivElement>;
   stages: readonly string[];
+  getStageLabel?: (stage: string) => string;
 };
 
 const COLUMN_STEP = 296;
 
-export function PipelineScrollToolbar({ containerRef, stages }: Props) {
+export function PipelineScrollToolbar({ containerRef, stages, getStageLabel = (stage) => stage }: Props) {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
@@ -85,7 +86,7 @@ export function PipelineScrollToolbar({ containerRef, stages }: Props) {
           <SelectValue placeholder="Ir para etapa" />
         </SelectTrigger>
         <SelectContent>
-          {stages.map((stage) => <SelectItem key={stage} value={stage}>{stage}</SelectItem>)}
+          {stages.map((stage) => <SelectItem key={stage} value={stage}>{getStageLabel(stage)}</SelectItem>)}
         </SelectContent>
       </Select>
     </div>

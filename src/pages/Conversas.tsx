@@ -7,6 +7,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { supabase } from "@/integrations/supabase/client";
 import { MessageSquare, Bot, User, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -32,14 +34,33 @@ type Mensagem = {
 };
 
 type LeadInfo = { cnpj: string; fantasia: string | null; status_sdr: string | null } | null;
+type Followup = {
+  id: string; contact_name: string | null; contact_phone: string | null; lead_cnpj: string | null;
+  classification: string | null; crm_state: "fora_crm" | "no_crm" | "ignorado";
+  last_direction: "in" | "out" | null; last_message_at: string | null; waiting_reply_since: string | null;
+};
 
 export default function Conversas() {
+  const { role } = useAuth();
   const [loading, setLoading] = useState(true);
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [aberta, setAberta] = useState<Conversa | null>(null);
   const [msgs, setMsgs] = useState<Mensagem[]>([]);
   const [msgsLoading, setMsgsLoading] = useState(false);
   const [lead, setLead] = useState<LeadInfo>(null);
+  const [followups, setFollowups] = useState<Followup[]>([]);
+
+  const loadGuilherme = useCallback(async () => {
+    if (role !== "manager") return;
+    const { data } = await (supabase.from("crm_whatsapp_followups") as any)
+      .select("id,contact_name,contact_phone,lead_cnpj,classification,crm_state,last_direction,last_message_at,waiting_reply_since")
+      .eq("owner", "guilherme")
+      .neq("crm_state", "ignorado")
+      .order("waiting_reply_since", { ascending: false, nullsFirst: false })
+      .order("last_message_at", { ascending: false, nullsFirst: false })
+      .limit(200);
+    setFollowups((data || []) as Followup[]);
+  }, [role]);
 
   const load = useCallback(async () => {
     // tabela multi-tenant: o flow não grava client_slug — o recorte certo é o
@@ -56,6 +77,7 @@ export default function Conversas() {
 
   useEffect(() => {
     load();
+    void loadGuilherme();
     // conversa nova / mensagem nova → recarrega a lista
     const ch = supabase
       .channel("crm-conversas-realtime")
@@ -63,7 +85,7 @@ export default function Conversas() {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "uchat_messages" }, load)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [load]);
+  }, [load, loadGuilherme]);
 
   async function abrir(c: Conversa) {
     setAberta(c);
@@ -109,14 +131,50 @@ export default function Conversas() {
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-lg font-bold">
             <MessageSquare className="h-5 w-5 text-primary" />
-            Conversas da Larissa
-            <span className="text-sm font-normal text-muted-foreground">WhatsApp · UChat</span>
+            Conversas comerciais
+            <span className="text-sm font-normal text-muted-foreground">WhatsApp</span>
           </h2>
-          <Button variant="outline" size="sm" onClick={() => { setLoading(true); load(); }}>
+          <Button variant="outline" size="sm" onClick={() => { setLoading(true); void load(); void loadGuilherme(); }}>
             <RefreshCw className="mr-1 h-3.5 w-3.5" /> atualizar
           </Button>
         </div>
 
+        <Tabs defaultValue={role === "manager" ? "guilherme" : "larissa"}>
+          <TabsList>
+            {role === "manager" && <TabsTrigger value="guilherme">Número do Guilherme</TabsTrigger>}
+            <TabsTrigger value="larissa">Larissa · UChat</TabsTrigger>
+          </TabsList>
+          {role === "manager" && (
+            <TabsContent value="guilherme" className="space-y-3 pt-2">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Aguardando nossa resposta</p><p className="text-2xl font-bold">{followups.filter((item) => item.waiting_reply_since).length}</p></CardContent></Card>
+                <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Conversas fora do CRM</p><p className="text-2xl font-bold">{followups.filter((item) => item.crm_state === "fora_crm").length}</p></CardContent></Card>
+              </div>
+              {followups.length === 0 ? (
+                <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Nenhuma conversa comercial sincronizada ainda.</CardContent></Card>
+              ) : (
+                <div className="divide-y rounded-lg border">
+                  {followups.map((item) => (
+                    <div key={item.id} className="flex items-center gap-3 p-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-success/10"><User className="h-4 w-4 text-success" /></div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate font-medium">{item.contact_name || item.contact_phone || "Contato"}</span>
+                          {item.waiting_reply_since && <Badge className="bg-amber-500/15 text-amber-700 hover:bg-amber-500/15">Aguardando resposta</Badge>}
+                          <Badge variant={item.crm_state === "no_crm" ? "secondary" : "outline"}>{item.crm_state === "no_crm" ? "No CRM" : "Fora do CRM"}</Badge>
+                          {item.classification && <Badge variant="outline" className="capitalize">{item.classification.replace("_", " ")}</Badge>}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{item.last_message_at ? formatDistanceToNow(new Date(item.last_message_at), { addSuffix: true, locale: ptBR }) : "Sem data"}</p>
+                      </div>
+                      {item.contact_phone && <Button asChild size="sm" variant="outline"><a href={`https://wa.me/${item.contact_phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">Abrir WhatsApp</a></Button>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">Por privacidade, o CRM guarda o estado da conversa e o vínculo com o lead, não o conteúdo do WhatsApp pessoal.</p>
+            </TabsContent>
+          )}
+          <TabsContent value="larissa" className="pt-2">
         {loading ? (
           <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
         ) : conversas.length === 0 ? (
@@ -149,6 +207,8 @@ export default function Conversas() {
             ))}
           </div>
         )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       <Sheet open={!!aberta} onOpenChange={(o) => !o && setAberta(null)}>

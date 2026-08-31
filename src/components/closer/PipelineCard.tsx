@@ -70,6 +70,11 @@ export function PipelineCard({ lead, onClick, atividades, ultimoContatoEm, ultim
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
+        <span className="inline-flex rounded bg-primary/10 px-1.5 py-0.5 text-xs font-bold text-primary">
+          {lead.mrr_proposta == null
+            ? "MRR não informado"
+            : `${lead.mrr_proposta.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/mês`}
+        </span>
         {lead.pipeline_review_required && (
           <span className="inline-flex rounded bg-warning/15 px-1.5 py-0.5 text-xs font-medium text-warning">
             revisar migração

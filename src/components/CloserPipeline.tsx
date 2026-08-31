@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Lead, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, ESTAGIO_COLORS, Atividade } from "@/types/lead";
+import { Lead, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, ESTAGIO_COLORS, Atividade, estagioLabel } from "@/types/lead";
 import { getKanbanLeads, transitionLeadStage, getLeadAtividades, getLeadsLastContact, LastContactInfo } from "@/store/leads-store";
 import { supabase } from "@/integrations/supabase/client";
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -137,7 +137,7 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
         offer: lead.oferta_comercial,
       });
       setLeads((prev) => prev.map((l) => (l.id === leadId ? updated : l)));
-      toast({ title: "Lead movido", description: `${lead.fantasia || lead.razao_social} → ${newStage}` });
+      toast({ title: "Lead movido", description: `${lead.fantasia || lead.razao_social} → ${estagioLabel(newStage)}` });
     } catch (error: unknown) {
       toast({
         title: "Movimentação bloqueada pelo playbook V2",
@@ -154,7 +154,7 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
   return (
     <div className="space-y-2">
       <PipelineFilters filters={filters} onChange={setFilters} />
-      <PipelineScrollToolbar containerRef={scrollContainerRef} stages={COLUMNS} />
+      <PipelineScrollToolbar containerRef={scrollContainerRef} stages={COLUMNS} getStageLabel={estagioLabel} />
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="relative">
           <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-background to-transparent" aria-hidden="true" />
@@ -165,7 +165,14 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
               const colLeads = filteredLeads.filter((l) => l.estagio_funil === col);
               const colorClass = ESTAGIO_COLORS[col] || "";
               return (
-                <PipelineColumn key={col} id={col} colorClass={colorClass} count={colLeads.length}>
+                <PipelineColumn
+                  key={col}
+                  id={col}
+                  label={estagioLabel(col)}
+                  colorClass={colorClass}
+                  count={colLeads.length}
+                  mrrTotal={colLeads.reduce((sum, lead) => sum + (lead.mrr_proposta || 0), 0)}
+                >
                   {colLeads.map((lead) => {
                     const lc = lastContacts.get(lead.id);
                     return (

@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect } from "react";
 import {
   Lead, STATUS_OPTIONS, LeadStatus, ESTAGIO_FUNIL_OPTIONS, EstagioFunil,
   calculateScore, MOTIVO_PERDA_LABEL, OFERTA_OPTIONS,
-  PLAYBOOK_VERSION, type MotivoPerda,
+  PLAYBOOK_VERSION, type MotivoPerda, estagioLabel, ORIGEM_COMERCIAL_LABEL,
+  type OrigemComercial, type TipoContaComercial, type TemperaturaLead,
 } from "@/types/lead";
 import { LeadTimeline } from "./LeadTimeline";
 import { ActivityModal } from "./ActivityModal";
@@ -626,6 +627,72 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                   </div>
                 )}
 
+                <Card className="border-primary/20 bg-primary/[0.02]">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Inteligência comercial</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Origem</Label>
+                      <Select value={current.origem_comercial || "nao_informado"} onValueChange={(v) => setField("origem_comercial", v === "nao_informado" ? null : v as OrigemComercial)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="nao_informado">Não informada</SelectItem>
+                          {(Object.entries(ORIGEM_COMERCIAL_LABEL) as [OrigemComercial, string][]).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Quem indicou</Label>
+                      <Input value={current.indicado_por || ""} onChange={(e) => setField("indicado_por", e.target.value || null)} placeholder="Pessoa ou empresa" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tipo de conta</Label>
+                      <Select value={current.tipo_conta_comercial || "nao_informado"} onValueChange={(v) => setField("tipo_conta_comercial", v === "nao_informado" ? null : v as TipoContaComercial)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="nao_informado">Não informado</SelectItem>
+                          <SelectItem value="imobiliaria">Imobiliária</SelectItem>
+                          <SelectItem value="incorporadora">Incorporadora</SelectItem>
+                          <SelectItem value="loteadora">Loteadora</SelectItem>
+                          <SelectItem value="outro">Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Nº de corretores</Label>
+                      <Input type="number" min={0} value={current.numero_corretores ?? ""} onChange={(e) => setField("numero_corretores", e.target.value === "" ? null : Number(e.target.value))} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>ICP</Label>
+                      <Select value={current.icp_confirmado == null ? "nao_informado" : current.icp_confirmado ? "sim" : "nao"} onValueChange={(v) => setField("icp_confirmado", v === "nao_informado" ? null : v === "sim")}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="nao_informado">Não avaliado</SelectItem>
+                          <SelectItem value="sim">Sim</SelectItem>
+                          <SelectItem value="nao">Não</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Temperatura</Label>
+                      <Select value={current.temperatura || "nao_informado"} onValueChange={(v) => setField("temperatura", v === "nao_informado" ? null : v as TemperaturaLead)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="nao_informado">Não classificada</SelectItem>
+                          <SelectItem value="quente">Quente</SelectItem>
+                          <SelectItem value="morno">Morno</SelectItem>
+                          <SelectItem value="frio">Frio</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label>MRR da proposta</Label>
+                      <Input type="number" min={0} step="0.01" value={current.mrr_proposta ?? ""} onChange={(e) => setField("mrr_proposta", e.target.value === "" ? null : Number(e.target.value))} placeholder="0,00" />
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <div className="space-y-2">
                   <Label>Estágio do Funil</Label>
                   <Select value={current.estagio_funil || ""} onValueChange={(v) => setField("estagio_funil", (v || null) as EstagioFunil | null)}>
@@ -637,7 +704,7 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
                         ? [current.estagio_funil,
                            ...(ALLOWED_PIPELINE_TRANSITIONS[current.estagio_funil] ?? [])]
                         : ESTAGIO_FUNIL_OPTIONS
-                      ).map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      ).map((s) => <SelectItem key={s} value={s}>{estagioLabel(s)}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

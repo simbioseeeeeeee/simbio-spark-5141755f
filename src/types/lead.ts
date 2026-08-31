@@ -43,6 +43,9 @@ export type MotivoPerda =
   | "desistencia"
   | "outro";
 export type PaymentStatus = "nao_iniciado" | "pendente" | "pago" | "vencido" | "cancelado";
+export type OrigemComercial = "live" | "diagnostico" | "outbound" | "indicacao" | "outros";
+export type TipoContaComercial = "imobiliaria" | "incorporadora" | "loteadora" | "outro";
+export type TemperaturaLead = "quente" | "morno" | "frio";
 
 export interface Socio {
   nome: string;
@@ -164,6 +167,18 @@ export interface Lead {
   updated_at?: string | null;
   origem_lead?: string | null;
   tipo_lead?: string | null;
+  origem_comercial?: OrigemComercial | null;
+  indicado_por?: string | null;
+  tipo_conta_comercial?: TipoContaComercial | null;
+  numero_corretores?: number | null;
+  icp_confirmado?: boolean | null;
+  temperatura?: TemperaturaLead | null;
+  mrr_proposta?: number | null;
+  proposta_realizada_em?: string | null;
+  proposta_aprovada_em?: string | null;
+  proposta_assinada_em?: string | null;
+  reuniao_realizada_em?: string | null;
+  no_show_em?: string | null;
   // Campos reais do Supabase mdewbruvzrrxezsbyzmq (snake_case)
   responsavel_sdr?: string | null;
   responsavel_closer?: string | null;
@@ -239,6 +254,35 @@ export const ESTAGIO_FUNIL_OPTIONS: EstagioFunil[] = [
   "Opt-out",
   "Fechado Perdido",
 ];
+
+export const ESTAGIO_LABEL: Record<EstagioFunil, string> = {
+  "Reunião Agendada": "Reunião agendada",
+  "Diagnóstico Realizado": "Reunião realizada",
+  "Proposta Enviada": "Proposta realizada",
+  "Em Negociação": "Em negociação",
+  "Aguardando Aceite": "Proposta aprovada",
+  "Aguardando Pagamento": "Proposta assinada / fechamento",
+  "Fechado Ganho": "Fechado ganho",
+  "No-show": "No-show",
+  "Nurturing": "Nurturing",
+  "Desqualificado": "Desqualificado",
+  "Opt-out": "Opt-out",
+  "Fechado Perdido": "Fechado perdido",
+};
+
+export function estagioLabel(stage?: string | null): string {
+  return stage && stage in ESTAGIO_LABEL
+    ? ESTAGIO_LABEL[stage as EstagioFunil]
+    : stage || "Sem etapa";
+}
+
+export const ORIGEM_COMERCIAL_LABEL: Record<OrigemComercial, string> = {
+  live: "Live",
+  diagnostico: "Diagnóstico",
+  outbound: "Outbound",
+  indicacao: "Indicação",
+  outros: "Outros",
+};
 
 export const OFERTA_OPTIONS: { id: OfferId; label: OfertaComercial }[] = [
   { id: "imersao", label: "Imersão" },

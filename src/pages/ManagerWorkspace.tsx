@@ -16,6 +16,7 @@ import { CloserPipeline } from "@/components/CloserPipeline";
 import { LeadExplorer } from "@/components/LeadExplorer";
 import { LeadProfile } from "@/components/LeadProfile";
 import { NewLeadModal } from "@/components/NewLeadModal";
+import { CommercialIntelligence } from "@/components/manager/CommercialIntelligence";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -590,6 +591,8 @@ function AnalyticsView({ territorio, onTerritorio }: { territorio: string; onTer
 
       {/* Placar da Máquina de Agendamento (métrica-mãe: 6 diagnósticos/dia) */}
       <MaquinaPlacar placar={placar} period={period} />
+
+      <CommercialIntelligence period={period} />
 
       {/* KPI Alert Banner */}
       {kpiAlerts.length > 0 && !alertsDismissed && (

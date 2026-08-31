@@ -22,20 +22,19 @@ interface Props {
 // 25/08: CNPJ deixou de ser obrigatório — lead atendido no WhatsApp não tem CNPJ à mão.
 // Sem CNPJ, a RPC gera o código pela origem (WA-/IG-/IND-/CIMI-/MAN- + telefone) e
 // exige telefone. Com CNPJ, continua igual.
-const ORIGENS: { value: string; label: string }[] = [
-  { value: "whatsapp_uchat", label: "WhatsApp (chegou pela Larissa / número comercial)" },
-  { value: "instagram_manual", label: "Instagram (DM)" },
-  { value: "indicacao", label: "Indicação" },
-  { value: "evento_cimi360", label: "Evento (CIMI 360)" },
-  { value: "live_simbiose", label: "Live" },
-  { value: "outros", label: "Outros" },
+const ORIGENS: { value: string; label: string; technical: string }[] = [
+  { value: "live", label: "Live", technical: "live_simbiose" },
+  { value: "diagnostico", label: "Diagnóstico", technical: "outros" },
+  { value: "outbound", label: "Outbound", technical: "outros" },
+  { value: "indicacao", label: "Indicação", technical: "indicacao" },
+  { value: "outros", label: "Outros", technical: "outros" },
 ];
 
 export function NewLeadModal({ onCreated }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    origem: "whatsapp_uchat",
+    origem: "outbound",
     cnpj: "",
     razao_social: "",
     fantasia: "",
@@ -45,6 +44,11 @@ export function NewLeadModal({ onCreated }: Props) {
     celular1: "",
     email1: "",
     observacoes_sdr: "",
+    indicado_por: "",
+    tipo_conta_comercial: "",
+    numero_corretores: "",
+    icp_confirmado: "",
+    temperatura: "",
   });
 
   const update = (field: string, value: string) =>
@@ -78,16 +82,30 @@ export function NewLeadModal({ onCreated }: Props) {
         p_uf: form.uf.trim() || undefined,
         p_celular: fone || undefined,
         p_email: form.email1.trim() || undefined,
-        p_origem: form.origem,
+        p_origem: ORIGENS.find((origem) => origem.value === form.origem)?.technical || "outros",
         p_observacoes: form.observacoes_sdr.trim() || undefined,
       });
       if (error) throw error;
 
       const codigo = (data as { cnpj?: string } | null)?.cnpj;
+      if (codigo) {
+        const { error: commercialError } = await (supabase.from("leads") as any)
+          .update({
+            origem_comercial: form.origem,
+            indicado_por: form.indicado_por.trim() || null,
+            tipo_conta_comercial: form.tipo_conta_comercial || null,
+            numero_corretores: form.numero_corretores === "" ? null : Number(form.numero_corretores),
+            icp_confirmado: form.icp_confirmado === "" ? null : form.icp_confirmado === "sim",
+            temperatura: form.temperatura || null,
+          })
+          .eq("cnpj", codigo);
+        if (commercialError) throw commercialError;
+      }
       toast({ title: "✅ Lead cadastrado!", description: `${nomeEmpresa} adicionado${codigo ? ` (${codigo})` : ""}.` });
       setForm({
-        origem: "whatsapp_uchat", cnpj: "", razao_social: "", fantasia: "", contato_nome: "", cidade: "", uf: "",
-        celular1: "", email1: "", observacoes_sdr: "",
+        origem: "outbound", cnpj: "", razao_social: "", fantasia: "", contato_nome: "", cidade: "", uf: "",
+        celular1: "", email1: "", observacoes_sdr: "", indicado_por: "", tipo_conta_comercial: "",
+        numero_corretores: "", icp_confirmado: "", temperatura: "",
       });
       setOpen(false);
       onCreated?.();
@@ -123,6 +141,44 @@ export function NewLeadModal({ onCreated }: Props) {
                 {ORIGENS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
               </SelectContent>
             </Select>
+          </div>
+          {form.origem === "indicacao" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="indicado_por">Quem indicou</Label>
+              <Input id="indicado_por" placeholder="Pessoa ou empresa" value={form.indicado_por} onChange={(e) => update("indicado_por", e.target.value)} />
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Tipo de conta</Label>
+              <Select value={form.tipo_conta_comercial} onValueChange={(v) => update("tipo_conta_comercial", v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="imobiliaria">Imobiliária</SelectItem>
+                  <SelectItem value="incorporadora">Incorporadora</SelectItem>
+                  <SelectItem value="loteadora">Loteadora</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Nº de corretores</Label>
+              <Input type="number" min={0} value={form.numero_corretores} onChange={(e) => update("numero_corretores", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>ICP</Label>
+              <Select value={form.icp_confirmado} onValueChange={(v) => update("icp_confirmado", v)}>
+                <SelectTrigger><SelectValue placeholder="Avaliar" /></SelectTrigger>
+                <SelectContent><SelectItem value="sim">Sim</SelectItem><SelectItem value="nao">Não</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Temperatura</Label>
+              <Select value={form.temperatura} onValueChange={(v) => update("temperatura", v)}>
+                <SelectTrigger><SelectValue placeholder="Classificar" /></SelectTrigger>
+                <SelectContent><SelectItem value="quente">Quente</SelectItem><SelectItem value="morno">Morno</SelectItem><SelectItem value="frio">Frio</SelectItem></SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="celular1">Telefone / WhatsApp <span className="text-destructive">*</span></Label>
