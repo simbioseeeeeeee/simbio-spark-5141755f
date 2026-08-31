@@ -32,5 +32,21 @@ test("painel comercial, fila do Guilherme e MRR da pipeline", async ({ page }) =
   await expect(page.getByText("Proposta aprovada", { exact: true })).toBeVisible();
   await expect(page.getByText("Proposta assinada / fechamento", { exact: true })).toBeVisible();
   await expect(page.getByText(/R\$.*\/mês/).first()).toBeVisible();
-});
 
+  await page.goto(`${BASE}/criativos`, { waitUntil: "domcontentloaded" });
+  await expect(page.getByText("Inventário real da conta de anúncios")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("button", { name: /Em veiculação/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Já veiculados/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Todos no Meta/ })).toBeVisible();
+
+  await page.goto(`${BASE}/leads`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Novo lead" }).click();
+  await expect(page.getByText("Cadastrar novo lead", { exact: true })).toBeVisible();
+  await page.getByLabel(/Como chegou/).click();
+  await expect(page.getByRole("option", { name: "Live", exact: true })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Diagnóstico", exact: true })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Outbound", exact: true })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Indicação", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+});
