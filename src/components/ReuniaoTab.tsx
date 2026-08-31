@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Copy, Ban, Plus, Trash2, ThumbsUp, ThumbsDown, CircleDashed,
   ClipboardCheck, Handshake, ExternalLink, Calculator, FileDown,
@@ -234,6 +235,20 @@ export function ReuniaoTab({
       setCotacao(result.quote);
       setQuoteId(result.quote_id);
       setPropostaAprovada(false);
+      const proposalMrr = result.quote.billing_type === "recurring"
+        ? Number(result.quote.recurring_monthly_brl || 0)
+        : 0;
+      const { error: mrrError } = await supabase
+        .from("leads")
+        .update({ mrr_proposta: proposalMrr } as any)
+        .eq("cnpj", cnpj);
+      if (mrrError) {
+        toast({
+          title: "Cotação calculada, mas o MRR não sincronizou",
+          description: "A cotação foi preservada. Preencha o MRR no painel do gerente.",
+          variant: "destructive",
+        });
+      }
     } catch (e: any) {
       toast({ title: "Cotação não calculada", description: e?.message, variant: "destructive" });
     } finally {

@@ -16,10 +16,15 @@ test("painel comercial, fila do Guilherme e MRR da pipeline", async ({ page }) =
   await login(page);
 
   await page.goto(`${BASE}/manager/painel`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByText("Inteligência comercial", { exact: true })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("Leads criados", { exact: true })).toBeVisible();
-  await page.getByRole("tab", { name: "Interno", exact: true }).click();
-  await expect(page.getByText("Pipeline aprovado", { exact: true })).toBeVisible();
+  await expect(page.getByText("Receita, custo e payback", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Investimento total", { exact: true })).toBeVisible();
+  await expect(page.getByText("MRR em propostas", { exact: true })).toBeVisible();
+  await expect(page.getByText("MRR aprovado", { exact: true })).toBeVisible();
+  await expect(page.getByText("Meta sincronizada", { exact: true })).toBeVisible();
+  await expect(page.getByText(/negócio\(s\) sem MRR/)).toBeVisible();
+  await page.getByRole("tab", { name: "Custos por campanha", exact: true }).click();
+  await expect(page.getByText("Campanha Meta", { exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: "Operação interna", exact: true }).click();
   await expect(page.getByText("Aguardando nossa resposta", { exact: true })).toBeVisible();
 
   await page.goto(`${BASE}/conversas`, { waitUntil: "domcontentloaded" });
