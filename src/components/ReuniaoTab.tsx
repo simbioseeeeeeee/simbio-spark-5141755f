@@ -259,9 +259,7 @@ export function ReuniaoTab({
   async function fecharNegocio() {
     setSalvando(true);
     try {
-      if (!avaliacoes[0]?.decisor_presente) {
-        throw new Error("A proposta exige decisor presente ou confirmado na avaliação desta reunião.");
-      }
+      // Avanço livre (decisão CEO 01/09): a proposta não exige mais decisor confirmado.
       if (!cotacao || !quoteId) throw new Error("Calcule e revise a cotação oficial antes do envio.");
       const r = await criarFechamento({
         lead_cnpj: cnpj,
@@ -754,12 +752,9 @@ export function ReuniaoTab({
                 />
                 Revisei dor, objetivo, oferta, escopo, exclusões, investimento, decisor e próximo passo; aprovo o envio.
               </label>
-              <Button size="sm" disabled={salvando || !cotacao || !propostaAprovada || !avaliacoes[0]?.decisor_presente} onClick={fecharNegocio}>
+              <Button size="sm" disabled={salvando || !cotacao || !propostaAprovada} onClick={fecharNegocio}>
                 {salvando ? "gerando…" : "aprovar e enviar PDF + termo"}
               </Button>
-              {!avaliacoes[0]?.decisor_presente && (
-                <p className="text-xs text-amber-700">Marque o decisor como presente/confirmado na avaliação antes de enviar.</p>
-              )}
             </div>
           )}
         </CardContent>

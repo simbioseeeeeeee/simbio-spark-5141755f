@@ -448,19 +448,14 @@ export async function transitionLeadStage(
   const validation = validatePipelineTransition(lead, target, context);
   if ("reason" in validation) throw new Error(validation.reason);
 
+  // Avanço livre (decisão CEO 01/09): o dropdown/Kanban pode setar qualquer etapa
+  // manualmente, inclusive Proposta Enviada / Aguardando Pagamento / Fechado Ganho.
+  // Os caminhos automáticos (API de proposta, aceite do termo, webhook de pagamento)
+  // continuam gravando esses estágios normalmente — só deixaram de ser exclusivos.
   const patch: Record<string, unknown> = {
     estagio_funil: target,
     playbook_version: PLAYBOOK_VERSION,
   };
-  if (target === "Proposta Enviada") {
-    throw new Error("Proposta Enviada é registrada pela API após aprovação e envio reais.");
-  }
-  if (target === "Aguardando Pagamento") {
-    throw new Error("Aguardando Pagamento é atualizado pelo aceite do termo.");
-  }
-  if (target === "Fechado Ganho" && !context.managerOverride) {
-    throw new Error("Fechado Ganho é atualizado pelo webhook de pagamento.");
-  }
   if (context.nextStepAt !== undefined) patch.data_proximo_passo = context.nextStepAt;
   if (context.lossReason !== undefined) patch.motivo_perda = context.lossReason;
   if (context.lossReasonDetail !== undefined) patch.motivo_perda_detalhe = context.lossReasonDetail;

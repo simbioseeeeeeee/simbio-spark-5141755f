@@ -10,7 +10,12 @@ import { getSdrPipelineLeads, SDR_PIPELINE_STATUSES, transitionSdrStatus } from 
 import { type Lead, type LeadStatus, STATUS_COLORS } from "@/types/lead";
 import { toast } from "@/hooks/use-toast";
 
-const DIRECT_DND_TARGETS = new Set<LeadStatus>(["Prospectado", "Em Qualificação"]);
+// Avanço livre (decisão CEO 01/09): arraste direto pra qualquer coluna, exceto
+// "Reunião Agendada" (essa nasce do botão Agendar, que cria o evento no Calendar).
+const DIRECT_DND_TARGETS = new Set<LeadStatus>([
+  "A Contatar", "Prospectado", "Em Qualificação", "Qualificado",
+  "Nurturing", "Desqualificado", "Opt-out", "Arquivo Morto", "Cliente Ativo",
+]);
 
 function SdrColumn({ status, leads, onOpen }: { status: LeadStatus; leads: Lead[]; onOpen: (lead: Lead) => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });

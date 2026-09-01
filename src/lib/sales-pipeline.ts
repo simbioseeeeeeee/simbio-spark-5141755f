@@ -45,38 +45,28 @@ function hasMinimumMeetingNotice(meetingAt: string | null | undefined): boolean 
   return Number.isFinite(timestamp) && timestamp >= Date.now() + TWO_HOURS_MS;
 }
 
-export const ALLOWED_PIPELINE_TRANSITIONS: Record<EstagioFunil, readonly EstagioFunil[]> = {
-  "Reunião Agendada": ["Diagnóstico Realizado", "No-show", "Nurturing", "Desqualificado", "Fechado Perdido", "Opt-out"],
-  "Diagnóstico Realizado": ["Proposta Enviada", "Nurturing", "Desqualificado", "Fechado Perdido", "Opt-out"],
-  "Proposta Enviada": ["Em Negociação", "Aguardando Aceite", "Nurturing", "Fechado Perdido", "Opt-out"],
-  "Em Negociação": ["Aguardando Aceite", "Proposta Enviada", "Nurturing", "Fechado Perdido", "Opt-out"],
-  "Aguardando Aceite": ["Em Negociação", "Aguardando Pagamento", "Fechado Perdido", "Opt-out"],
-  "Aguardando Pagamento": ["Fechado Ganho", "Em Negociação", "Fechado Perdido", "Opt-out"],
-  "No-show": ["Reunião Agendada", "Nurturing", "Desqualificado", "Opt-out"],
-  "Nurturing": ["Reunião Agendada", "Diagnóstico Realizado", "Opt-out"],
-  "Desqualificado": [],
-  "Opt-out": [],
-  "Fechado Ganho": [],
-  "Fechado Perdido": ["Em Negociação"],
-};
+// Avanço livre (decisão CEO 01/09): qualquer etapa do funil pode ir para qualquer
+// outra. A matriz continua existindo para POPULAR os dropdowns/Kanban — agora com
+// todas as etapas. Sem pré-requisito de decisor/pagamento/oferta (ver validadores).
+export const ALLOWED_PIPELINE_TRANSITIONS: Record<EstagioFunil, readonly EstagioFunil[]> =
+  Object.fromEntries(
+    ESTAGIO_FUNIL_OPTIONS.map((s) => [s, ESTAGIO_FUNIL_OPTIONS] as const),
+  ) as Record<EstagioFunil, readonly EstagioFunil[]>;
 
-export const ALLOWED_SDR_TRANSITIONS: Record<LeadStatus, readonly LeadStatus[]> = {
-  "A Contatar": ["Prospectado", "Em Qualificação", "Nurturing", "Desqualificado", "Opt-out"],
-  // Prospectado = o webhook já mandou o primeiro toque e o lead ainda não respondeu.
-  "Prospectado": ["Em Qualificação", "Qualificado", "Nurturing", "Desqualificado", "Opt-out"],
-  "Em Qualificação": ["Qualificado", "Nurturing", "Desqualificado", "Opt-out"],
-  "Qualificado": ["Reunião Agendada", "Em Qualificação", "Nurturing", "Desqualificado", "Opt-out"],
-  "Reunião Agendada": ["Qualificado", "Nurturing", "Opt-out"],
-  "Nurturing": ["Em Qualificação", "Qualificado", "Desqualificado", "Opt-out"],
-  "Desqualificado": ["Nurturing"],
-  "Opt-out": [],
-  "Arquivo Morto": ["A Contatar", "Nurturing"],
-  "Cliente Ativo": ["Nurturing"],
-};
+const ALL_SDR_STATUSES: readonly LeadStatus[] = [
+  "A Contatar", "Prospectado", "Em Qualificação", "Qualificado", "Reunião Agendada",
+  "Nurturing", "Desqualificado", "Opt-out", "Arquivo Morto", "Cliente Ativo",
+];
+
+// Avanço livre: qualquer status SDR pode ir para qualquer outro.
+export const ALLOWED_SDR_TRANSITIONS: Record<LeadStatus, readonly LeadStatus[]> =
+  Object.fromEntries(
+    ALL_SDR_STATUSES.map((s) => [s, ALL_SDR_STATUSES] as const),
+  ) as Record<LeadStatus, readonly LeadStatus[]>;
 
 /** Status que a UI pode oferecer a partir do atual, incluindo ficar onde está. */
 export function allowedSdrTargets(current: LeadStatus): LeadStatus[] {
-  return [current, ...(ALLOWED_SDR_TRANSITIONS[current] ?? [])];
+  return Array.from(new Set<LeadStatus>([current, ...(ALLOWED_SDR_TRANSITIONS[current] ?? [])]));
 }
 
 export function validateSdrTransition(
@@ -86,22 +76,9 @@ export function validateSdrTransition(
   meetingAt?: string | null,
   meetingUrl?: string | null,
 ): TransitionValidation {
-  if (current === target) return { ok: true };
-  if (target === "Opt-out") return { ok: true };
-  // status vindo do banco que a matriz não conhece não pode derrubar a ficha
-  const permitidos = ALLOWED_SDR_TRANSITIONS[current] ?? [];
-  if (!permitidos.includes(target)) {
-    return { ok: false, reason: `Transição SDR não permitida: ${current} → ${target}.` };
-  }
-  if (target === "Reunião Agendada" && !eventId?.trim()) {
-    return { ok: false, reason: "Reunião Agendada exige um event_id real da agenda." };
-  }
-  if (target === "Reunião Agendada" && (!meetingAt || !meetingUrl?.trim())) {
-    return { ok: false, reason: "Reunião Agendada exige data, horário e link reais." };
-  }
-  if (target === "Reunião Agendada" && !hasMinimumMeetingNotice(meetingAt)) {
-    return { ok: false, reason: "O diagnóstico exige antecedência mínima de 2 horas." };
-  }
+  // Avanço livre (decisão CEO 01/09): sem pré-requisitos para mudar o status SDR.
+  // (params mantidos por compatibilidade de assinatura com os chamadores.)
+  void current; void target; void eventId; void meetingAt; void meetingUrl;
   return { ok: true };
 }
 
@@ -129,68 +106,10 @@ export function validatePipelineTransition(
   target: EstagioFunil,
   context: TransitionContext = {},
 ): TransitionValidation {
-  const current = lead.estagio_funil;
-
-  if (current === target) return { ok: true };
-  if (current === "No-show" && target === "Reunião Agendada" && (lead.no_show_reagenda_tentativas || 0) >= 1) {
-    return { ok: false, reason: "No-show permite uma única tentativa de reagendamento; mova para Nurturing." };
-  }
-  if (current && isPipelineStage(current)) {
-    const allowed = ALLOWED_PIPELINE_TRANSITIONS[current] ?? [];
-    if (!allowed.includes(target)) {
-      return { ok: false, reason: `Transição não permitida: ${current} → ${target}.` };
-    }
-  } else if (target !== "Reunião Agendada") {
-    return { ok: false, reason: "A entrada no funil do closer deve acontecer por Reunião Agendada." };
-  }
-
-  if (target === "Reunião Agendada" && !(context.eventId || lead.meeting_event_id)?.trim()) {
-    return { ok: false, reason: "Reunião Agendada exige um event_id real da agenda." };
-  }
-  if (target === "Reunião Agendada" && (!(context.meetingAt || lead.data_reuniao_agendada) || !(context.meetingUrl || lead.reuniao_url)?.trim())) {
-    return { ok: false, reason: "Reunião Agendada exige data, horário e link reais." };
-  }
-  if (target === "Reunião Agendada" && !hasMinimumMeetingNotice(context.meetingAt || lead.data_reuniao_agendada)) {
-    return { ok: false, reason: "O diagnóstico exige antecedência mínima de 2 horas." };
-  }
-
-  if (ACTIVE_STAGES.has(target) && !(context.nextStepAt || lead.data_proximo_passo)) {
-    return { ok: false, reason: `${target} exige próximo passo com data.` };
-  }
-
-  if (target === "Proposta Enviada" && !(context.offer || lead.oferta_comercial)) {
-    return { ok: false, reason: "Proposta Enviada exige uma oferta comercial canônica." };
-  }
-  if (target === "Proposta Enviada" && !lead.decisor_confirmado) {
-    return { ok: false, reason: "Proposta Enviada exige decisor confirmado." };
-  }
-
-  if (target === "Aguardando Pagamento" && !lead.aceite_em) {
-    return { ok: false, reason: "Aguardando Pagamento exige aceite confirmado." };
-  }
-
-  if (target === "Fechado Perdido") {
-    const reason = context.lossReason || lead.motivo_perda;
-    if (!reason) return { ok: false, reason: "Fechado Perdido exige motivo estruturado." };
-    if (reason === "outro" && !(context.lossReasonDetail || lead.motivo_perda_detalhe)?.trim()) {
-      return { ok: false, reason: "O motivo 'Outro' exige uma explicação." };
-    }
-  }
-
-  if (target === "Fechado Ganho") {
-    const paid = lead.payment_status === "pago";
-    const override = context.managerOverride === true
-      || Boolean(lead.ganho_override_em && lead.ganho_override_motivo?.trim());
-    const overrideReason = context.managerOverrideReason || lead.ganho_override_motivo;
-    if (!paid && !(override && overrideReason?.trim())) {
-      return { ok: false, reason: "Fechado Ganho exige pagamento confirmado ou override gerencial justificado." };
-    }
-  }
-
-  if (TERMINAL_OR_EXIT_STAGES.has(target) && target !== "Fechado Perdido" && target !== "Fechado Ganho") {
-    return { ok: true };
-  }
-
+  // Avanço livre (decisão CEO 01/09): humano move o lead para qualquer etapa sem
+  // exigir decisor, oferta, próximo passo, aceite, pagamento ou motivo. As regras
+  // antigas ficaram no histórico do git (rollback: git revert).
+  void lead; void target; void context;
   return { ok: true };
 }
 
