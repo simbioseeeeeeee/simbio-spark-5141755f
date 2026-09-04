@@ -26,8 +26,8 @@ const lead = (patch: Partial<Lead> = {}) => ({
 }) as Lead;
 
 describe("pipeline comercial V2", () => {
-  it("impede pular a qualificação SDR", () => {
-    expect(validateSdrTransition("A Contatar", "Qualificado").ok).toBe(false);
+  it("permite avanço manual livre na qualificação SDR", () => {
+    expect(validateSdrTransition("A Contatar", "Qualificado")).toEqual({ ok: true });
   });
 
   it("permite opt-out global a partir de qualquer status, inclusive terminal", () => {
@@ -36,8 +36,8 @@ describe("pipeline comercial V2", () => {
     expect(validateSdrTransition("Opt-out", "Opt-out")).toEqual({ ok: true });
   });
 
-  it("exige evento real também na passagem SDR para reunião", () => {
-    expect(validateSdrTransition("Qualificado", "Reunião Agendada").ok).toBe(false);
+  it("permite mover manualmente para reunião mesmo sem evento", () => {
+    expect(validateSdrTransition("Qualificado", "Reunião Agendada")).toEqual({ ok: true });
     expect(validateSdrTransition(
       "Qualificado",
       "Reunião Agendada",
@@ -47,12 +47,12 @@ describe("pipeline comercial V2", () => {
     )).toEqual({ ok: true });
   });
 
-  it("bloqueia reunião sem event_id real", () => {
+  it("permite entrada manual no closer sem event_id", () => {
     const result = validatePipelineTransition(
       lead({ estagio_funil: null, meeting_event_id: null }),
       "Reunião Agendada",
     );
-    expect(result).toEqual({ ok: false, reason: "Reunião Agendada exige um event_id real da agenda." });
+    expect(result).toEqual({ ok: true });
   });
 
   it("aceita entrada no closer quando a reunião possui event_id", () => {
@@ -67,59 +67,59 @@ describe("pipeline comercial V2", () => {
     )).toEqual({ ok: true });
   });
 
-  it("bloqueia salto de Reunião Agendada para Proposta Enviada", () => {
+  it("permite salto manual de Reunião Agendada para Proposta Enviada", () => {
     const result = validatePipelineTransition(lead(), "Proposta Enviada", {
       offer: "Operação",
     });
-    expect(result.ok).toBe(false);
+    expect(result).toEqual({ ok: true });
   });
 
-  it("limita no-show a uma tentativa de reagendamento", () => {
+  it("permite que o humano reagende um no-show", () => {
     const result = validatePipelineTransition(
       lead({ estagio_funil: "No-show", no_show_reagenda_tentativas: 1 }),
       "Reunião Agendada",
     );
-    expect(result.ok).toBe(false);
+    expect(result).toEqual({ ok: true });
   });
 
-  it("exige próximo passo nas etapas comerciais ativas", () => {
+  it("não bloqueia etapa ativa sem próximo passo", () => {
     const result = validatePipelineTransition(
       lead({ data_proximo_passo: null }),
       "Diagnóstico Realizado",
     );
-    expect(result.ok).toBe(false);
+    expect(result).toEqual({ ok: true });
   });
 
-  it("exige oferta canônica ao enviar proposta", () => {
+  it("não bloqueia proposta sem oferta preenchida", () => {
     const result = validatePipelineTransition(
       lead({ estagio_funil: "Diagnóstico Realizado" }),
       "Proposta Enviada",
     );
-    expect(result.ok).toBe(false);
+    expect(result).toEqual({ ok: true });
   });
 
-  it("não permite proposta sem decisor confirmado", () => {
+  it("não bloqueia proposta sem decisor confirmado", () => {
     const result = validatePipelineTransition(
       lead({ estagio_funil: "Diagnóstico Realizado", oferta_comercial: "Operação" }),
       "Proposta Enviada",
     );
-    expect(result).toEqual({ ok: false, reason: "Proposta Enviada exige decisor confirmado." });
+    expect(result).toEqual({ ok: true });
   });
 
-  it("separa aceite de pagamento", () => {
+  it("não bloqueia avanço manual por falta de aceite", () => {
     const result = validatePipelineTransition(
       lead({ estagio_funil: "Aguardando Aceite" }),
       "Aguardando Pagamento",
     );
-    expect(result).toEqual({ ok: false, reason: "Aguardando Pagamento exige aceite confirmado." });
+    expect(result).toEqual({ ok: true });
   });
 
-  it("bloqueia ganho sem pagamento", () => {
+  it("permite ganho manual sem pagamento", () => {
     const result = validatePipelineTransition(
       lead({ estagio_funil: "Aguardando Pagamento", aceite_em: "2026-08-17T10:00:00Z" }),
       "Fechado Ganho",
     );
-    expect(result.ok).toBe(false);
+    expect(result).toEqual({ ok: true });
   });
 
   it("aceita ganho com pagamento confirmado", () => {
@@ -130,12 +130,12 @@ describe("pipeline comercial V2", () => {
     expect(result).toEqual({ ok: true });
   });
 
-  it("exige motivo estruturado na perda", () => {
+  it("permite perda manual sem motivo estruturado", () => {
     const result = validatePipelineTransition(
       lead({ estagio_funil: "Em Negociação" }),
       "Fechado Perdido",
     );
-    expect(result.ok).toBe(false);
+    expect(result).toEqual({ ok: true });
   });
 
   it("permite registrar perda diretamente na avaliação da reunião com motivo", () => {
@@ -146,13 +146,13 @@ describe("pipeline comercial V2", () => {
     )).toEqual({ ok: true });
   });
 
-  it("exige detalhe quando o motivo é Outro", () => {
+  it("permite perda manual com motivo Outro ainda sem detalhe", () => {
     const result = validatePipelineTransition(
       lead({ estagio_funil: "Em Negociação" }),
       "Fechado Perdido",
       { lossReason: "outro" },
     );
-    expect(result.ok).toBe(false);
+    expect(result).toEqual({ ok: true });
   });
 });
 

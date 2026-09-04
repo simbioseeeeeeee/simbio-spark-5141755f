@@ -42,7 +42,7 @@ export type MotivoPerda =
   | "concorrente"
   | "desistencia"
   | "outro";
-export type PaymentStatus = "nao_iniciado" | "pendente" | "pago" | "vencido" | "cancelado";
+export type PaymentStatus = "nao_iniciado" | "aguardando" | "pago" | "vencido" | "cancelado";
 export type OrigemComercial = "live" | "diagnostico" | "outbound" | "indicacao" | "outros";
 export type TipoContaComercial = "imobiliaria" | "incorporadora" | "loteadora" | "outro";
 export type TemperaturaLead = "quente" | "morno" | "frio";

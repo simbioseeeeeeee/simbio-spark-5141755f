@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -7,19 +8,23 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import SdrWorkspace from "./pages/SdrWorkspace";
-import CloserWorkspace from "./pages/CloserWorkspace";
-import ManagerWorkspace from "./pages/ManagerWorkspace";
-import MetasComercial from "./pages/MetasComercial";
-import Conversas from "./pages/Conversas";
-import SocialSelling from "./pages/SocialSelling";
-import Plano from "./pages/Plano";
-import Criativos from "./pages/Criativos";
-import LeadsOverhaul from "./pages/LeadsOverhaul";
-import Campanhas from "./pages/Campanhas";
-import Playbook from "./pages/Playbook";
-import ManagerSistema from "./pages/ManagerSistema";
 import NotFound from "./pages/NotFound";
+
+// Cada área operacional carrega só quando é aberta. Antes todas as páginas —
+// inclusive gráficos de gerente e componentes do closer — entravam no primeiro
+// bundle, mesmo para uma SDR que só precisava da lista de leads.
+const SdrWorkspace = lazy(() => import("./pages/SdrWorkspace"));
+const CloserWorkspace = lazy(() => import("./pages/CloserWorkspace"));
+const ManagerWorkspace = lazy(() => import("./pages/ManagerWorkspace"));
+const MetasComercial = lazy(() => import("./pages/MetasComercial"));
+const Conversas = lazy(() => import("./pages/Conversas"));
+const SocialSelling = lazy(() => import("./pages/SocialSelling"));
+const Plano = lazy(() => import("./pages/Plano"));
+const Criativos = lazy(() => import("./pages/Criativos"));
+const LeadsOverhaul = lazy(() => import("./pages/LeadsOverhaul"));
+const Campanhas = lazy(() => import("./pages/Campanhas"));
+const Playbook = lazy(() => import("./pages/Playbook"));
+const ManagerSistema = lazy(() => import("./pages/ManagerSistema"));
 
 const queryClient = new QueryClient();
 
@@ -30,6 +35,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Carregando área…</div>}>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
@@ -53,6 +59,7 @@ const App = () => (
             <Route path="/metas" element={<ProtectedRoute allowedRoles={["sdr", "closer", "manager"]}><MetasComercial /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

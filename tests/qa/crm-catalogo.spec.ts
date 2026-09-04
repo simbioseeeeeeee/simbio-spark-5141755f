@@ -14,7 +14,7 @@ async function login(page: Page, email: string) {
 
 test("catálogo comercial carrega no browser autenticado", async ({ page }) => {
   test.setTimeout(120000);
-  await login(page, "qa-closer@simbiosedigital.com");
+  await login(page, process.env.QA_CLOSER_EMAIL || "qa-closer@simbiosedigital.com");
 
   // mesma chamada que a aba Reunião faz, com o token da sessão do navegador
   const r = await page.evaluate(async () => {

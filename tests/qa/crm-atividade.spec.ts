@@ -27,7 +27,7 @@ test("atividade + tarefa + plano", async ({ page }) => {
     }
   });
 
-  await login(page, "qa-sdr@simbiosedigital.com");
+  await login(page, process.env.QA_SDR_EMAIL || "qa-sdr@simbiosedigital.com");
 
   // ── painel de tarefas: concluir uma pesquisa (deve marcar pesquisa_realizada) ──
   await page.goto(`${BASE}/sdr`, { waitUntil: "domcontentloaded" });
@@ -91,7 +91,7 @@ test("plano do sprint grava status", async ({ page }) => {
       achados.push(`HTTP ${r.status()} ${r.url().split("/").pop()?.slice(0, 40)} → ${b}`);
     }
   });
-  await login(page, "qa-manager@simbiosedigital.com");
+  await login(page, process.env.QA_MANAGER_EMAIL || "qa-manager@simbiosedigital.com");
   await page.goto(`${BASE}/plano`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(3500);
   const btns = page.getByRole("button", { name: /^fazendo$/i });

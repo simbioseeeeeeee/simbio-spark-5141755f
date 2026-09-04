@@ -48,9 +48,10 @@ const META_DIA = 30; // imobiliárias trabalhadas por dia
 
 export default function SocialSelling() {
   const [loading, setLoading] = useState(true);
+  const [loadingAlvos, setLoadingAlvos] = useState(false);
   const [mapa, setMapa] = useState<LinhaMapa[]>([]);
   const [cidade, setCidade] = useState<string | null>(null);
-  const [pracaAtiva, setPracaAtiva] = useState<string | null>(null);
+  const [buscaCidade, setBuscaCidade] = useState("");
   const [alvos, setAlvos] = useState<Alvo[]>([]);
   const [busca, setBusca] = useState("");
   const [soPendentes, setSoPendentes] = useState(true);
@@ -62,7 +63,9 @@ export default function SocialSelling() {
   // Duas filas de 40, uma por perfil. Divide alternado pra que cada perfil pegue alvos de
   // portes e praças parecidos — se cortasse pela metade, um perfil ficaria só com Uberlândia.
   const filaDoDia = useMemo(() => {
-    const elegiveis = alvos.filter((a) => a.ig_handle).slice(0, COTA_DIA * 2);
+    const elegiveis = alvos
+      .filter((a) => a.ig_handle && ["alto", "encontrado"].includes(a.ig_status))
+      .slice(0, COTA_DIA * 2);
     return {
       simbiose: elegiveis.filter((_, i) => i % 2 === 0),
       guilherme: elegiveis.filter((_, i) => i % 2 === 1),
@@ -70,54 +73,35 @@ export default function SocialSelling() {
   }, [alvos]);
   const [feitasHoje, setFeitasHoje] = useState(0);
 
-  // Praça única: quando comercial_config.praca_atual está preenchida, a tela mostra SÓ ela.
-  // Foco de uma cidade por vez (decisão 11/08). Trocar de praça = trocar aquele campo, e o
-  // mapa inteiro volta sozinho se ela for esvaziada.
+  // Todas as cidades ficam disponíveis para a Rayana. A view tem mais de 2 mil
+  // linhas e o PostgREST limita uma resposta a 1.000, então buscamos em páginas.
   const carregaMapa = useCallback(async () => {
-    const { data: cfg } = await supabase
-      .from("comercial_config" as any)
-      .select("praca_atual")
-      .eq("id", 1)
-      .maybeSingle();
-    // praca_atual virou LISTA (separada por vírgula) — são 4 praças simultâneas.
-    // Uma string só continua funcionando: vira lista de um item.
-    const bruto = ((cfg as any)?.praca_atual as string | null) ?? null;
-    const ativas = bruto ? bruto.split(",").map((s) => s.trim()).filter(Boolean) : [];
-    setPracaAtiva(bruto);
-
-    // Com praça ativa, busca ELA no banco em vez de filtrar o top 60 — Águas Lindas tem 23
-    // alvos e nem aparece no top 80 por volume, então filtrar a lista deixaria a tela VAZIA.
-    if (ativas.length) {
-      // busca cada praça por igualdade — filtrar o top 60 por volume deixaria de fora as
-      // pequenas (Águas Lindas tem 23 alvos e nem entra no top 80) e a tela ficaria vazia.
+    setLoading(true);
+    try {
       const linhas: LinhaMapa[] = [];
-      for (const a of ativas) {
-        const [uf, nome] = [a.slice(-2), a.slice(0, -3)];
-        const { data: uma } = await supabase
+      const pageSize = 1_000;
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
           .from("social_selling_mapa" as any)
           .select("*")
-          .eq("cidade", nome)
-          .eq("uf", uf);
-        if (uma?.length) linhas.push(...((uma as any[]) as LinhaMapa[]));
+          .order("total", { ascending: false })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const batch = ((data as any[]) || []) as LinhaMapa[];
+        linhas.push(...batch);
+        if (batch.length < pageSize) break;
       }
-      linhas.sort((x, y) => y.total - x.total);
       setMapa(linhas);
-      setCidade((c) => c ?? ativas[0]);
+    } catch (error: any) {
+      toast({ title: "Erro ao carregar cidades", description: error.message, variant: "destructive" });
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const { data } = await supabase
-      .from("social_selling_mapa" as any)
-      .select("*")
-      .order("total", { ascending: false })
-      .limit(60);
-    setMapa(((data as any[]) || []) as LinhaMapa[]);
-    setLoading(false);
   }, []);
 
   const carregaAlvos = useCallback(async (c: string | null) => {
     if (!c) { setAlvos([]); return; }
+    setLoadingAlvos(true);
     const [uf, nome] = [c.slice(-2), c.slice(0, -3)];
     let q = supabase
       .from("social_selling_alvos" as any)
@@ -131,8 +115,14 @@ export default function SocialSelling() {
       .limit(300);
     if (soPendentes) q = q.is("concluido_em", null);
     if (soComIg) q = q.not("ig_handle", "is", null);
-    const { data } = await q;
-    setAlvos(((data as any[]) || []) as Alvo[]);
+    const { data, error } = await q;
+    if (error) {
+      toast({ title: "Erro ao carregar perfis", description: error.message, variant: "destructive" });
+      setAlvos([]);
+    } else {
+      setAlvos(((data as any[]) || []) as Alvo[]);
+    }
+    setLoadingAlvos(false);
   }, [soPendentes, soComIg]);
 
   const contaHoje = useCallback(async () => {
@@ -195,19 +185,48 @@ export default function SocialSelling() {
       updated_at: new Date().toISOString(),
     };
     setAlvos((prev) => prev.map((x) => (x.cnpj === a.cnpj ? { ...x, ...patch } as Alvo : x)));
-    await supabase.from("social_selling_alvos" as any).update(patch).eq("cnpj", a.cnpj);
+    const { data, error } = await supabase.from("social_selling_alvos" as any)
+      .update(patch).eq("cnpj", a.cnpj).select("cnpj");
+    if (error || !data?.length) {
+      setAlvos((prev) => prev.map((x) => (x.cnpj === a.cnpj ? a : x)));
+      toast({ title: "Instagram não foi salvo", description: error?.message || "Perfil não localizado.", variant: "destructive" });
+    }
   }
 
   async function marcarSemInstagram(a: Alvo) {
     const patch = { ig_status: "nao_tem", ig_handle: null, updated_at: new Date().toISOString() };
     setAlvos((prev) => prev.map((x) => (x.cnpj === a.cnpj ? { ...x, ...patch } as Alvo : x)));
-    await supabase.from("social_selling_alvos" as any).update(patch).eq("cnpj", a.cnpj);
+    const { data, error } = await supabase.from("social_selling_alvos" as any)
+      .update(patch).eq("cnpj", a.cnpj).select("cnpj");
+    if (error || !data?.length) {
+      setAlvos((prev) => prev.map((x) => (x.cnpj === a.cnpj ? a : x)));
+      toast({ title: "Marcação não foi salva", description: error?.message || "Perfil não localizado.", variant: "destructive" });
+    }
   }
 
-  const comLicenciado = useMemo(
-    () => mapa.filter((m) => alvos.length === 0 || true),
-    [mapa, alvos],
-  );
+  async function confirmarHandle(a: Alvo) {
+    const patch = { ig_status: "encontrado", updated_at: new Date().toISOString() };
+    const { data, error } = await supabase.from("social_selling_alvos" as any)
+      .update(patch).eq("cnpj", a.cnpj).select("cnpj");
+    if (error || !data?.length) {
+      toast({ title: "Perfil não foi confirmado", description: error?.message || "Perfil não localizado.", variant: "destructive" });
+      return;
+    }
+    setAlvos((prev) => prev.map((x) => (x.cnpj === a.cnpj ? { ...x, ...patch } : x)));
+  }
+
+  const cidadesFiltradas = useMemo(() => {
+    const termo = buscaCidade.trim().toLocaleLowerCase("pt-BR");
+    const encontradas = termo
+      ? mapa.filter((m) => `${m.cidade}/${m.uf}`.toLocaleLowerCase("pt-BR").includes(termo))
+      : mapa;
+    const visiveis = encontradas.slice(0, termo ? 100 : 48);
+    if (cidade && !visiveis.some((m) => `${m.cidade}/${m.uf}` === cidade)) {
+      const selecionada = mapa.find((m) => `${m.cidade}/${m.uf}` === cidade);
+      if (selecionada) return [selecionada, ...visiveis];
+    }
+    return visiveis;
+  }, [mapa, buscaCidade, cidade]);
 
   const filtrados = useMemo(() => {
     const t = busca.trim().toLowerCase();
@@ -246,16 +265,25 @@ export default function SocialSelling() {
         {/* mapa por cidade */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <MapPin className="h-4 w-4" />
-              {pracaAtiva
-                ? `${pracaAtiva.split(",").length} praças ativas — as demais estão ocultas de propósito`
-                : "Praças — comece pelas que têm licenciado Netspaces"}
+            <CardTitle className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                Todas as cidades ({mapa.length.toLocaleString("pt-BR")})
+              </span>
+              <div className="relative ml-auto">
+                <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  value={buscaCidade}
+                  onChange={(e) => setBuscaCidade(e.target.value)}
+                  placeholder="buscar cidade ou UF"
+                  className="h-9 w-56 pl-7"
+                />
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {comLicenciado.slice(0, 24).map((m) => {
+              {cidadesFiltradas.map((m) => {
                 const key = `${m.cidade}/${m.uf}`;
                 const pct = m.total ? Math.round((m.concluidas / m.total) * 100) : 0;
                 return (
@@ -272,6 +300,11 @@ export default function SocialSelling() {
                 );
               })}
             </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              {buscaCidade.trim()
+                ? `${cidadesFiltradas.length} resultado(s) exibido(s).`
+                : "As 48 maiores aparecem primeiro; use a busca para acessar qualquer outra cidade."}
+            </p>
           </CardContent>
         </Card>
 
@@ -305,6 +338,10 @@ export default function SocialSelling() {
                     onClick={() => setSoPendentes((v) => !v)}>
                     {soPendentes ? "só pendentes" : "todas"}
                   </Button>
+                  <Button size="sm" variant={soComIg ? "default" : "outline"}
+                    onClick={() => setSoComIg((v) => !v)}>
+                    {soComIg ? "com Instagram" : "todos para pesquisar"}
+                  </Button>
                   <div className="relative">
                     <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                     <Input value={busca} onChange={(e) => setBusca(e.target.value)}
@@ -314,6 +351,13 @@ export default function SocialSelling() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
+              {loadingAlvos ? (
+                <div className="space-y-2 p-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -342,11 +386,19 @@ export default function SocialSelling() {
                                 onBlur={(e) => e.target.value.trim().replace(/^@/, "") !== (a.ig_handle || "")
                                   && salvarHandle(a, e.target.value)} />
                               {a.ig_handle ? (
-                                <a href={`https://instagram.com/${a.ig_handle}`} target="_blank"
-                                   rel="noopener noreferrer" title="abrir perfil"
-                                   className="shrink-0 text-muted-foreground hover:text-foreground">
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
+                                <>
+                                  <a href={`https://instagram.com/${a.ig_handle}`} target="_blank"
+                                     rel="noopener noreferrer" title="abrir perfil"
+                                     className="shrink-0 text-muted-foreground hover:text-foreground">
+                                    <ExternalLink className="h-4 w-4" />
+                                  </a>
+                                  {a.ig_status === "revisar" && (
+                                    <Button size="sm" variant="outline" className="h-8 px-2 text-xs"
+                                      onClick={() => confirmarHandle(a)}>
+                                      confirmar
+                                    </Button>
+                                  )}
+                                </>
                               ) : (
                                 <button onClick={() => marcarSemInstagram(a)} title="marcar como sem Instagram"
                                   className="shrink-0 text-xs text-muted-foreground hover:text-foreground">
@@ -386,6 +438,7 @@ export default function SocialSelling() {
                   </TableBody>
                 </Table>
               </div>
+              )}
             </CardContent>
           </Card>
         )}

@@ -13,15 +13,15 @@ type Achado = { rota: string; tipo: string; detalhe: string };
 const ROTAS_COMUNS = ["/plano", "/criativos", "/campanhas", "/metas", "/conversas", "/leads", "/playbook"];
 const POR_PAPEL: Record<string, { email: string; rotas: string[] }> = {
   sdr: {
-    email: "qa-sdr@simbiosedigital.com",
+    email: process.env.QA_SDR_EMAIL || "qa-sdr@simbiosedigital.com",
     rotas: [...ROTAS_COMUNS, "/social-selling", "/sdr", "/sdr/anuncios"],
   },
   closer: {
-    email: "qa-closer@simbiosedigital.com",
+    email: process.env.QA_CLOSER_EMAIL || "qa-closer@simbiosedigital.com",
     rotas: [...ROTAS_COMUNS, "/closer"],
   },
   manager: {
-    email: "qa-manager@simbiosedigital.com",
+    email: process.env.QA_MANAGER_EMAIL || "qa-manager@simbiosedigital.com",
     rotas: [...ROTAS_COMUNS, "/social-selling", "/sdr", "/closer",
             "/manager/painel", "/manager/cadencia", "/manager/pipeline", "/manager/sistema"],
   },

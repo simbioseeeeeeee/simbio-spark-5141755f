@@ -1,103 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Lead } from "@/types/lead";
+import { rowToLead } from "@/store/leads-store";
 
 const PAGE_SIZE = 50;
-
-// mdewbruvzrrxezsbyzmq tem socios como colunas flat (socio1_nome...socio5_nome).
-// Aqui sintetizamos em array pra manter compatibilidade com Lead.socios[].
-function flatSocios(row: any) {
-  const out: any[] = [];
-  for (let i = 1; i <= 5; i++) {
-    const nome = row[`socio${i}_nome`];
-    if (!nome) continue;
-    out.push({
-      nome,
-      telefone1: row[`socio${i}_telefone1`] || undefined,
-      telefone2: row[`socio${i}_telefone2`] || undefined,
-      celular1: row[`socio${i}_celular1`] || undefined,
-      celular2: row[`socio${i}_celular2`] || undefined,
-      email1: row[`socio${i}_email1`] || undefined,
-    });
-  }
-  return out;
-}
-
-function rowToLead(row: any): Lead {
-  return {
-    // PK oficial do mdew é cnpj; mantém id pra React keys e compat
-    id: row.id || row.cnpj || "",
-    cnpj: row.cnpj || "",
-    razao_social: row.razao_social || "",
-    fantasia: row.fantasia || "",
-    data_abertura: row.data_abertura || "",
-    situacao: row.situacao || "",
-    cnae_descricao: row.cnae_descricao || "",
-    logradouro: row.logradouro || "",
-    numero: row.numero || "",
-    complemento: row.complemento || "",
-    bairro: row.bairro || "",
-    cidade: row.cidade || "",
-    uf: row.uf || "",
-    cep: row.cep || "",
-    telefone1: row.telefone1 || "",
-    telefone2: row.telefone2 || "",
-    celular1: row.celular1 || "",
-    celular2: row.celular2 || "",
-    email1: row.email1 || "",
-    email2: row.email2 || "",
-    socios: Array.isArray(row.socios) ? row.socios : flatSocios(row),
-    status_sdr: row.status_sdr || "A Contatar",
-    possui_site: row.possui_site ?? false,
-    url_site: row.url_site || "",
-    instagram_ativo: row.instagram_ativo ?? false,
-    url_instagram: row.url_instagram || "",
-    faz_anuncios: row.faz_anuncios ?? false,
-    whatsapp_automacao: row.whatsapp_automacao ?? false,
-    whatsapp_humano: row.whatsapp_humano ?? false,
-    observacoes_sdr: row.observacoes_sdr || "",
-    // "Reunião Realizada"/"Negociação" são vocabulário legado do backend —
-    // sem normalizar, o lead some do quadro e transições dão erro
-    estagio_funil: ({ "Reunião Realizada": "Diagnóstico Realizado",
-                      "Negociação": "Em Negociação" } as Record<string, string>)[
-                     String(row.estagio_funil)] ?? row.estagio_funil ?? null,
-    data_proximo_passo: row.data_proximo_passo || null,
-    observacoes_closer: row.observacoes_closer || "",
-    pesquisa_realizada: row.pesquisa_realizada ?? false,
-    lead_score: row.lead_score ?? null,
-    status_cadencia: row.status_cadencia || "ativo",
-    created_at: row.created_at,
-    updated_at: row.updated_at ?? null,
-    origem_lead: row.origem_lead ?? null,
-    tipo_lead: row.tipo_lead ?? null,
-    origem_comercial: row.origem_comercial ?? null,
-    indicado_por: row.indicado_por ?? null,
-    tipo_conta_comercial: row.tipo_conta_comercial ?? null,
-    numero_corretores: row.numero_corretores ?? null,
-    icp_confirmado: row.icp_confirmado ?? null,
-    temperatura: row.temperatura ?? null,
-    mrr_proposta: row.mrr_proposta == null ? null : Number(row.mrr_proposta),
-    proposta_realizada_em: row.proposta_realizada_em ?? null,
-    proposta_aprovada_em: row.proposta_aprovada_em ?? null,
-    proposta_assinada_em: row.proposta_assinada_em ?? null,
-    reuniao_realizada_em: row.reuniao_realizada_em ?? null,
-    no_show_em: row.no_show_em ?? null,
-    // Campos nativos do mdew
-    responsavel_sdr: row.responsavel_sdr || null,
-    responsavel_closer: row.responsavel_closer || null,
-    motivo_perda: row.motivo_perda || null,
-    stage_changed_at: row.stage_changed_at || null,
-    tentativas_followup: row.tentativas_followup ?? null,
-    data_ultimo_contato: row.data_ultimo_contato || null,
-    qtde_funcionarios: row.qtde_funcionarios ?? null,
-    cnae: row.cnae || null,
-    cnae_grupo: row.cnae_grupo || null,
-    cnae_setor: row.cnae_setor || null,
-    tipo_empresa: row.tipo_empresa || null,
-    deleted_at: row.deleted_at || null,
-    deleted_by: row.deleted_by || null,
-    deletion_reason: row.deletion_reason || null,
-  };
-}
 
 export type StatusTab =
   | "all"
@@ -227,35 +132,22 @@ export async function getLeadsOverhaul(q: OverhaulQuery): Promise<OverhaulResult
 export async function getTabCounts(
   baseFilters: Omit<OverhaulQuery, "page" | "tab" | "closerReadyOnly">
 ): Promise<Record<StatusTab, number>> {
-  const tabs: StatusTab[] = [
-    "all",
-    "A Contatar",
-    "Em Qualificação",
-    "Qualificado",
-    "Reunião Agendada",
-    "Em Negociação",
-    "Fechado Ganho",
-    "Fechado Perdido",
-    "Nurturing",
-    "Opt-out",
-    "Desqualificado",
-    "Lixeira",
-  ];
-
-  const results = await Promise.all(
-    tabs.map(async (tab) => {
-      let q = supabase.from("leads").select("*", { count: "exact", head: true });
-      q = applyCommonFilters(q, { ...baseFilters, tab, page: 0 });
-      const { count, error } = await q;
-      if (error) return [tab, 0] as const;
-      return [tab, count ?? 0] as const;
-    })
-  );
+  const { data, error } = await (supabase.rpc as any)("crm_lead_tab_counts", {
+    p_origens: baseFilters.origens?.length ? baseFilters.origens : null,
+    p_tipos: baseFilters.tipos?.length ? baseFilters.tipos : null,
+    p_hide_acelerador: baseFilters.tipos?.length ? false : (baseFilters.hideAcelerador ?? false),
+    p_responsavel: baseFilters.responsavelId || null,
+    p_cidade: baseFilters.cidade && baseFilters.cidade !== "__all__" ? baseFilters.cidade : null,
+    p_uf: baseFilters.uf && baseFilters.uf !== "__all__" ? baseFilters.uf : null,
+    p_last_days: baseFilters.lastDays || null,
+    p_search: baseFilters.search?.trim() || null,
+  });
+  if (error) throw error;
 
   const out: Record<string, number> = {};
-  results.forEach(([tab, n]) => {
-    out[tab] = n;
-  });
+  for (const row of (data || []) as Array<{ tab: StatusTab; total: number | string }>) {
+    out[row.tab] = Number(row.total) || 0;
+  }
   return out as Record<StatusTab, number>;
 }
 

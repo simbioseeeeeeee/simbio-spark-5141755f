@@ -7,7 +7,7 @@ import {
 } from "@/types/lead";
 import { LeadTimeline } from "./LeadTimeline";
 import { ActivityModal } from "./ActivityModal";
-import { updateLead, transitionLeadStage, registrarReuniaoAgendada, leadHasReuniaoActivity, getLeadsLastContact } from "@/store/leads-store";
+import { updateLead, registrarReuniaoAgendada, leadHasReuniaoActivity, getLeadsLastContact } from "@/store/leads-store";
 import { archiveLead } from "@/store/leads-overhaul-store";
 import { lastContactLabel, lastContactColor, activityEmoji, CANAL_CONFIG } from "@/lib/contact-helpers";
 import { useAuth } from "@/contexts/AuthContext";
@@ -238,8 +238,9 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
 
       const toSave: Lead = {
         ...current,
-        lead_score: calculateScore(current),
-        pesquisa_realizada: true,
+        // Editar negociação não significa que a pesquisa digital foi feita.
+        // Antes qualquer clique em Salvar contaminava esse indicador.
+        lead_score: current.pesquisa_realizada ? calculateScore(current) : current.lead_score,
       };
 
       if (lead && toSave.status_sdr !== lead.status_sdr) {
@@ -254,31 +255,14 @@ export function LeadProfile({ lead, open, onClose, onSaved }: Props) {
       }
 
       const shouldLogMeeting = lead?.status_sdr !== "Reunião Agendada" && toSave.status_sdr === "Reunião Agendada";
-      let transitionResult: Lead | null = null;
-      if (toSave.estagio_funil && toSave.estagio_funil !== lead?.estagio_funil) {
-        transitionResult = await transitionLeadStage(lead || toSave, toSave.estagio_funil, {
-          eventId: toSave.meeting_event_id,
-          meetingAt: toSave.data_reuniao_agendada,
-          meetingUrl: toSave.reuniao_url,
-          nextStepAt: toSave.data_proximo_passo,
-          lossReason: (toSave.motivo_perda || null) as MotivoPerda | null,
-          lossReasonDetail: toSave.motivo_perda_detalhe,
-          offer: toSave.oferta_comercial,
-          managerOverride: role === "manager" && managerOverrideApproved,
-          managerOverrideReason: toSave.ganho_override_motivo,
-        });
-      }
-      // A mudança para Reunião Agendada e sua atividade são confirmadas depois
-      // pela mesma RPC. Assim uma falha de auditoria nunca deixa o status salvo
-      // sem a atividade canônica (nem o inverso).
+      // Uma única gravação persiste ficha + etapa + oferta. O fluxo anterior fazia
+      // duas atualizações do mesmo lead; cada uma acionava o realtime do Kanban e
+      // iniciava uma nova carga completa enquanto a anterior ainda estava rodando.
+      // A reunião segue pela RPC dedicada porque ela precisa registrar a atividade
+      // canônica na mesma transação.
       let updated = await updateLead({
         ...toSave,
         status_sdr: shouldLogMeeting ? (lead?.status_sdr || "A Contatar") : toSave.status_sdr,
-        estagio_funil: transitionResult?.estagio_funil ?? toSave.estagio_funil,
-        proposta_enviada_em: transitionResult?.proposta_enviada_em ?? toSave.proposta_enviada_em,
-        ganho_override_em: transitionResult?.ganho_override_em ?? toSave.ganho_override_em,
-        ganho_override_motivo: transitionResult?.ganho_override_motivo ?? toSave.ganho_override_motivo,
-        playbook_version: transitionResult?.playbook_version ?? toSave.playbook_version,
       });
       let meetingLogError: string | null = null;
 

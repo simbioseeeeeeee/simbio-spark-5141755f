@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Lead, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, ESTAGIO_COLORS, Atividade, estagioLabel } from "@/types/lead";
-import { getKanbanLeads, transitionLeadStage, getLeadAtividades, getLeadsLastContact, LastContactInfo } from "@/store/leads-store";
+import { Lead, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, ESTAGIO_COLORS, estagioLabel } from "@/types/lead";
+import { getKanbanLeads, transitionLeadStage, getLeadsLastContact, LastContactInfo, rowToLead } from "@/store/leads-store";
 import { supabase } from "@/integrations/supabase/client";
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Loader2 } from "lucide-react";
@@ -20,10 +20,10 @@ const COLUMNS: EstagioFunil[] = ESTAGIO_FUNIL_OPTIONS;
 
 export function CloserPipeline({ territorio, onSelectLead }: Props) {
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [atividades, setAtividades] = useState<Record<string, Atividade[]>>({});
   const [lastContacts, setLastContacts] = useState<Map<string, LastContactInfo>>(new Map());
   const [loading, setLoading] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const movingLeadsRef = useRef(new Set<string>());
   const [filters, setFilters] = useState<PipelineFilterValues>({
     search: "",
     scoreFilter: "all",
@@ -39,19 +39,12 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
     try {
       const data = await getKanbanLeads(territorio);
       setLeads(data);
-      const atvsMap: Record<string, Atividade[]> = {};
-      await Promise.all(
-        data.slice(0, 50).map(async (lead) => {
-          try {
-            atvsMap[lead.id] = await getLeadAtividades(lead.id, 3);
-          } catch { atvsMap[lead.id] = []; }
-        })
-      );
-      setAtividades(atvsMap);
-      // Fetch last contacts
+      // Uma RPC em lote substitui as antigas 50 consultas individuais de atividade.
       if (data.length > 0) {
         const contacts = await getLeadsLastContact(data.map((l) => l.id));
         setLastContacts(contacts);
+      } else {
+        setLastContacts(new Map());
       }
     } catch (error: unknown) {
       toast({ title: "Erro ao carregar pipeline", description: errorMessage(error, "Atualize a página e tente novamente."), variant: "destructive" });
@@ -62,7 +55,9 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Realtime: reconcile every pipeline transition, including changes from another session.
+  // Realtime: reconcilia a linha recebida sem recarregar o Kanban inteiro. Antes
+  // cada UPDATE disparava dezenas de requests; salvar uma ficha podia fazer três
+  // UPDATEs seguidos e deixar a interface presa em cargas concorrentes.
   useEffect(() => {
     const channel = supabase
       .channel('closer-pipeline-realtime')
@@ -86,12 +81,19 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
               console.warn("[closer-pipeline] alerta sonoro indisponível", error);
             }
           }
-          void loadData();
+          const updated = rowToLead(newLead);
+          const belongsToPipeline = !updated.deleted_at
+            && (updated.status_sdr === "Reunião Agendada" || Boolean(updated.estagio_funil))
+            && (!territorio || updated.cidade === territorio);
+          setLeads((current) => {
+            const withoutUpdated = current.filter((item) => item.cnpj !== updated.cnpj);
+            return belongsToPipeline ? [updated, ...withoutUpdated] : withoutUpdated;
+          });
         }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [loadData]);
+  }, [territorio]);
 
   // Apply filters & sorting
   const filteredLeads = useMemo(() => {
@@ -125,7 +127,12 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
 
     const lead = leads.find((l) => l.id === leadId);
     if (!lead || lead.estagio_funil === newStage) return;
+    if (movingLeadsRef.current.has(leadId)) return;
 
+    movingLeadsRef.current.add(leadId);
+    setLeads((current) => current.map((item) => (
+      item.id === leadId ? { ...item, estagio_funil: newStage } : item
+    )));
     try {
       const updated = await transitionLeadStage(lead, newStage, {
         eventId: lead.meeting_event_id,
@@ -139,11 +146,14 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
       setLeads((prev) => prev.map((l) => (l.id === leadId ? updated : l)));
       toast({ title: "Lead movido", description: `${lead.fantasia || lead.razao_social} → ${estagioLabel(newStage)}` });
     } catch (error: unknown) {
+      setLeads((current) => current.map((item) => (item.id === leadId ? lead : item)));
       toast({
-        title: "Movimentação bloqueada pelo playbook V2",
-        description: `${errorMessage(error, "A etapa não foi alterada.")} Abra o card e preencha os campos obrigatórios.`,
+        title: "Não foi possível mover o lead",
+        description: errorMessage(error, "A etapa não foi alterada. Tente novamente."),
         variant: "destructive",
       });
+    } finally {
+      movingLeadsRef.current.delete(leadId);
     }
   };
 
@@ -180,7 +190,7 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
                       key={lead.id}
                       lead={lead}
                       onClick={() => onSelectLead(lead)}
-                      atividades={atividades[lead.id] || []}
+                      atividades={[]}
                       ultimoContatoEm={lc?.ultimo_contato_em}
                       ultimoContatoTipo={lc?.ultimo_contato_tipo}
                     />

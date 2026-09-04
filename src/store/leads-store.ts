@@ -132,6 +132,9 @@ export function rowToLead(row: any): Lead {
     cnae_grupo: row.cnae_grupo ?? null,
     cnae_setor: row.cnae_setor ?? null,
     tipo_empresa: row.tipo_empresa ?? null,
+    deleted_at: row.deleted_at ?? null,
+    deleted_by: row.deleted_by ?? null,
+    deletion_reason: row.deletion_reason ?? null,
   };
 }
 
@@ -431,6 +434,9 @@ export async function updateLead(lead: Lead): Promise<Lead> {
       icp_confirmado: lead.icp_confirmado ?? null,
       temperatura: lead.temperatura || null,
       mrr_proposta: lead.mrr_proposta ?? null,
+      oferta_comercial: lead.oferta_comercial || null,
+      decisor_confirmado: lead.decisor_confirmado ?? false,
+      ganho_override_motivo: lead.ganho_override_motivo?.trim() || null,
     } as any)
     // a PK de leads e cnpj — nao existe coluna id (era a razao de o drag nunca salvar)
     .eq("cnpj", lead.cnpj || lead.id)

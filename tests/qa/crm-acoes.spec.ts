@@ -63,7 +63,7 @@ test("SDR: qualificação, atividade e tarefas", async ({ page }) => {
   test.setTimeout(300000);
   let ctx = "sdr-setup";
   instrumenta(page, () => ctx);
-  await login(page, "qa-sdr@simbiosedigital.com");
+  await login(page, process.env.QA_SDR_EMAIL || "qa-sdr@simbiosedigital.com");
 
   // ── 1. Ficha: qualificação completa + salvar ──
   ctx = "ficha/salvar";
@@ -144,7 +144,7 @@ test("Manager: plano, criativos, metas, playbook, pipeline", async ({ page }) =>
   let ctx = "manager-setup";
   const antes = achados.length;
   instrumenta(page, () => ctx);
-  await login(page, "qa-manager@simbiosedigital.com");
+  await login(page, process.env.QA_MANAGER_EMAIL || "qa-manager@simbiosedigital.com");
 
   // ── Plano: mudar status + anotar ──
   ctx = "plano";

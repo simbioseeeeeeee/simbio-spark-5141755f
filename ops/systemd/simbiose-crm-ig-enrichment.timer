@@ -1,0 +1,11 @@
+[Unit]
+Description=Simbiose CRM - agenda pesquisa de Instagram em lotes controlados
+
+[Timer]
+OnCalendar=*-*-* 12,14,16,18,20:20:00 UTC
+RandomizedDelaySec=10m
+Persistent=true
+Unit=simbiose-crm-ig-enrichment.service
+
+[Install]
+WantedBy=timers.target
