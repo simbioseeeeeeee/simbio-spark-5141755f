@@ -1,11 +1,57 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Lead, Socio, Atividade, CADENCE_GAPS } from "@/types/lead";
+import { Lead, Socio, Atividade, PLAYBOOK_VERSION, type EstagioFunil, type LeadStatus } from "@/types/lead";
+import { validatePipelineTransition, type TransitionContext } from "@/lib/sales-pipeline";
+import {
+  type ActivityDraft,
+  mapLegacyActivity,
+} from "@/lib/crm-domain";
 
 const PAGE_SIZE = 50;
 
-function rowToLead(row: any): Lead {
+export function mapActivityToDatabase(tipo: string, resultado: string) {
+  const { activityType, activityResult } = mapLegacyActivity(tipo, resultado);
+  return { tipoAtividade: activityType, resultadoAtividade: activityResult };
+}
+
+// mdew guarda sócio em coluna flat (socio1_nome … socio5_email1). Ler row.socios
+// devolvia sempre [] e o Quadro Societário nascia vazio — justo os telefones que
+// a SDR usa pra ligar quando o número principal não atende.
+function flatSocios(row: any): Socio[] {
+  const out: Socio[] = [];
+  for (let i = 1; i <= 5; i++) {
+    const nome = row[`socio${i}_nome`];
+    if (!nome) continue;
+    out.push({
+      nome,
+      telefone1: row[`socio${i}_telefone1`] || undefined,
+      telefone2: row[`socio${i}_telefone2`] || undefined,
+      celular1: row[`socio${i}_celular1`] || undefined,
+      celular2: row[`socio${i}_celular2`] || undefined,
+      email1: row[`socio${i}_email1`] || undefined,
+    } as Socio);
+  }
+  return out;
+}
+
+// O banco pode carregar vocabulário que o front não conhece (ex.: "Reunião
+// Realizada", que o pós-reunião gravou até 21/08). Normaliza na leitura pra
+// nenhum estágio desconhecido derrubar o quadro de novo.
+const ESTAGIO_ALIASES: Record<string, string> = {
+  "Reunião Realizada": "Diagnóstico Realizado",
+  "Negociação": "Em Negociação",
+};
+
+function normalizaEstagio(v: any): any {
+  if (!v) return v;
+  return ESTAGIO_ALIASES[String(v)] ?? v;
+}
+
+export function rowToLead(row: any): Lead {
   return {
-    id: row.id,
+    // A tabela leads NAO tem coluna id — a PK e cnpj. Sem o fallback, todo card do
+    // Kanban nascia com id undefined: o drag quebrava, atividades nao carregavam e o
+    // LeadProfile abria VAZIO (comparava undefined === undefined e usava o form nulo).
+    id: row.id || row.cnpj,
     cnpj: row.cnpj || "",
     razao_social: row.razao_social || "",
     fantasia: row.fantasia || "",
@@ -25,7 +71,7 @@ function rowToLead(row: any): Lead {
     celular2: row.celular2 || "",
     email1: row.email1 || "",
     email2: row.email2 || "",
-    socios: Array.isArray(row.socios) ? (row.socios as Socio[]) : [],
+    socios: Array.isArray(row.socios) && row.socios.length ? (row.socios as Socio[]) : flatSocios(row),
     status_sdr: row.status_sdr || "A Contatar",
     possui_site: row.possui_site || false,
     url_site: row.url_site || "",
@@ -35,19 +81,93 @@ function rowToLead(row: any): Lead {
     whatsapp_automacao: row.whatsapp_automacao || false,
     whatsapp_humano: row.whatsapp_humano || false,
     observacoes_sdr: row.observacoes_sdr || "",
-    estagio_funil: row.estagio_funil || null,
-    valor_negocio_estimado: row.valor_negocio_estimado || null,
+    estagio_funil: normalizaEstagio(row.estagio_funil) || null,
     data_proximo_passo: row.data_proximo_passo || null,
     observacoes_closer: row.observacoes_closer || "",
     pesquisa_realizada: row.pesquisa_realizada || false,
     lead_score: row.lead_score ?? null,
-    dia_cadencia: row.dia_cadencia ?? 0,
     status_cadencia: row.status_cadencia || "ativo",
     created_at: row.created_at,
-    owner_id: row.owner_id || null,
-    sdr_id: row.sdr_id || null,
-    canal_preferido: row.canal_preferido || "nao_definido",
+    updated_at: row.updated_at ?? null,
+    origem_lead: row.origem_lead ?? null,
+    tipo_lead: row.tipo_lead ?? null,
+    origem_comercial: row.origem_comercial ?? null,
+    indicado_por: row.indicado_por ?? null,
+    tipo_conta_comercial: row.tipo_conta_comercial ?? null,
+    numero_corretores: row.numero_corretores ?? null,
+    icp_confirmado: row.icp_confirmado ?? null,
+    temperatura: row.temperatura ?? null,
+    mrr_proposta: row.mrr_proposta == null ? null : Number(row.mrr_proposta),
+    proposta_realizada_em: row.proposta_realizada_em ?? null,
+    proposta_aprovada_em: row.proposta_aprovada_em ?? null,
+    proposta_assinada_em: row.proposta_assinada_em ?? null,
+    reuniao_realizada_em: row.reuniao_realizada_em ?? null,
+    no_show_em: row.no_show_em ?? null,
+    responsavel_sdr: row.responsavel_sdr ?? null,
+    responsavel_closer: row.responsavel_closer ?? null,
+    motivo_perda: row.motivo_perda ?? null,
+    motivo_perda_detalhe: row.motivo_perda_detalhe ?? null,
+    meeting_event_id: row.meeting_event_id ?? null,
+    data_reuniao_agendada: row.data_reuniao_agendada ?? null,
+    reuniao_url: row.reuniao_url ?? row.reuniao_calendly_url ?? null,
+    stage_changed_at: row.stage_changed_at ?? null,
+    playbook_version: row.playbook_version ?? null,
+    fit_score: row.fit_score ?? null,
+    fit_score_breakdown: row.fit_score_breakdown ?? null,
+    execution_score: row.execution_score ?? null,
+    decisor_confirmado: row.decisor_confirmado ?? false,
+    oferta_comercial: row.oferta_comercial ?? null,
+    proposta_enviada_em: row.proposta_enviada_em ?? null,
+    aceite_em: row.aceite_em ?? null,
+    payment_status: row.payment_status ?? "nao_iniciado",
+    pagamento_em: row.pagamento_em ?? null,
+    ganho_override_em: row.ganho_override_em ?? null,
+    ganho_override_motivo: row.ganho_override_motivo ?? null,
+    pipeline_review_required: row.pipeline_review_required ?? false,
+    no_show_reagenda_tentativas: row.no_show_reagenda_tentativas ?? 0,
+    tentativas_followup: row.tentativas_followup ?? null,
+    data_ultimo_contato: row.data_ultimo_contato ?? null,
+    qtde_funcionarios: row.qtde_funcionarios ?? null,
+    cnae: row.cnae ?? null,
+    cnae_grupo: row.cnae_grupo ?? null,
+    cnae_setor: row.cnae_setor ?? null,
+    tipo_empresa: row.tipo_empresa ?? null,
+    deleted_at: row.deleted_at ?? null,
+    deleted_by: row.deleted_by ?? null,
+    deletion_reason: row.deletion_reason ?? null,
   };
+}
+
+export const SDR_PIPELINE_STATUSES: readonly LeadStatus[] = [
+  "A Contatar",
+  "Prospectado",
+  "Em Qualificação",
+  "Qualificado",
+  "Reunião Agendada",
+];
+
+export async function getSdrPipelineLeads(): Promise<Lead[]> {
+  const { data, error } = await supabase
+    .from("leads")
+    .select("*")
+    .is("deleted_at", null)
+    .in("status_sdr", [...SDR_PIPELINE_STATUSES])
+    .order("updated_at", { ascending: false })
+    .limit(1_000);
+  if (error) throw error;
+  return (data || []).map(rowToLead);
+}
+
+export async function transitionSdrStatus(lead: Pick<Lead, "id" | "cnpj">, target: LeadStatus): Promise<Lead> {
+  const { data, error } = await supabase.rpc("transition_sdr_status" as never, {
+    p_lead_cnpj: lead.cnpj || lead.id,
+    p_target: target,
+    p_origin: "sdr_pipeline",
+  } as never);
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("O status foi processado, mas o lead atualizado não foi retornado.");
+  return rowToLead(row);
 }
 
 // ─── Territory ───────────────────────────────────────────────
@@ -124,61 +244,44 @@ export async function registrarAtividade(
   nota: string,
   userId?: string
 ): Promise<Lead> {
-  // 1. Insert activity with sdr_id tracking
-  const insertData: any = {
-    lead_id: lead.id,
-    tipo_atividade: tipo,
-    resultado: resultado,
-    nota: nota,
-  };
-  if (userId) insertData.sdr_id = userId;
-
-  const { error: actErr } = await supabase.from("atividades").insert(insertData);
-  if (actErr) throw actErr;
-
-  // 2. Calculate next step
-  const novoDia = lead.dia_cadencia + 1;
-  const gapDias = CADENCE_GAPS[novoDia] || 2;
-  const proximoPasso = new Date();
-  proximoPasso.setDate(proximoPasso.getDate() + gapDias);
-
-  // 3. Determine new status
-  let newStatus = lead.status_sdr;
-  let newStatusCadencia = lead.status_cadencia;
-  let newEstagioFunil = lead.estagio_funil;
-
   if (resultado === "Agendou Reunião") {
-    newStatus = "Reunião Agendada" as any;
-    newStatusCadencia = "concluido";
-    newEstagioFunil = "Reunião Agendada" as any;
-  } else if (resultado === "Recusou") {
-    newStatus = "Desqualificado" as any;
-    newStatusCadencia = "concluido";
-  } else if (novoDia >= 10) {
-    newStatusCadencia = "expirado";
-  } else if (newStatus === "A Contatar") {
-    newStatus = "Em Qualificação" as any;
+    throw new Error("Use o agendamento com Calendar/Meet; a reunião exige event_id, data, horário e link reais.");
   }
 
-  // 4. Update lead (also set sdr_id if not set)
-  const updateData: any = {
-    dia_cadencia: novoDia,
-    status_cadencia: newStatusCadencia,
-    data_proximo_passo: proximoPasso.toISOString(),
-    status_sdr: newStatus,
-    estagio_funil: newEstagioFunil,
-  };
-  if (userId && !lead.sdr_id) updateData.sdr_id = userId;
+  const mapped = mapActivityToDatabase(tipo, resultado);
+  return recordActivity(lead, {
+    type: mapped.tipoAtividade,
+    result: mapped.resultadoAtividade,
+    direction: "out",
+    note: nota,
+    occurredAt: new Date().toISOString(),
+  }, true, userId ? { requestedBy: userId } : undefined);
+}
 
-  const { data, error: updErr } = await supabase
-    .from("leads")
-    .update(updateData)
-    .eq("id", lead.id)
-    .select()
-    .single();
-  if (updErr) throw updErr;
+export async function recordActivity(
+  lead: Pick<Lead, "id" | "cnpj">,
+  draft: ActivityDraft,
+  advanceCadence: boolean,
+  context?: Record<string, unknown>,
+): Promise<Lead> {
+  const { data, error } = await supabase.rpc("record_crm_activity" as never, {
+    p_lead_cnpj: lead.cnpj || lead.id,
+    p_tipo: draft.type,
+    p_resultado: draft.result,
+    p_nota: draft.note || null,
+    p_direcao: draft.direction,
+    p_ocorrido_em: new Date(draft.occurredAt).toISOString(),
+    p_avancar_cadencia: advanceCadence,
+    p_contexto: {
+      origin: advanceCadence ? "cadence_queue" : "lead_profile",
+      ...context,
+    },
+  } as never);
+  if (error) throw error;
 
-  return rowToLead(data);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("A atividade foi processada, mas o lead atualizado não foi retornado.");
+  return rowToLead(row);
 }
 
 export async function getLeadAtividades(leadId: string, limit = 10): Promise<Atividade[]> {
@@ -215,7 +318,7 @@ export interface LeadsResult {
 }
 
 export async function getLeadsPaginated(q: LeadsQuery): Promise<LeadsResult> {
-  let query = supabase.from("leads").select("*", { count: "exact" });
+  let query = supabase.from("leads").select("*", { count: "exact" }).is("deleted_at", null);
 
   if (q.cidade && q.cidade !== "__all__") {
     query = query.eq("cidade", q.cidade);
@@ -231,7 +334,7 @@ export async function getLeadsPaginated(q: LeadsQuery): Promise<LeadsResult> {
     query = query.eq("pesquisa_realizada", false);
   }
 
-  if (q.scoreFilter === "qualificados") {
+  if (q.scoreFilter === "pesquisa_digital_60") {
     query = query.gte("lead_score", 60);
   }
 
@@ -289,6 +392,7 @@ export async function getKanbanLeads(cidade?: string): Promise<Lead[]> {
   let query = supabase
     .from("leads")
     .select("*")
+    .is("deleted_at", null)
     .or("status_sdr.eq.Reunião Agendada,estagio_funil.not.is.null");
 
   if (cidade) {
@@ -315,16 +419,60 @@ export async function updateLead(lead: Lead): Promise<Lead> {
       whatsapp_humano: lead.whatsapp_humano,
       observacoes_sdr: lead.observacoes_sdr,
       estagio_funil: lead.estagio_funil,
-      valor_negocio_estimado: lead.valor_negocio_estimado,
       data_proximo_passo: lead.data_proximo_passo,
       observacoes_closer: lead.observacoes_closer,
       pesquisa_realizada: lead.pesquisa_realizada,
       lead_score: lead.lead_score,
-      dia_cadencia: lead.dia_cadencia,
-      status_cadencia: lead.status_cadencia,
-      canal_preferido: lead.canal_preferido || "nao_definido",
-    })
-    .eq("id", lead.id)
+      motivo_perda: lead.motivo_perda || null,
+      motivo_perda_detalhe: lead.motivo_perda_detalhe || null,
+      playbook_version: PLAYBOOK_VERSION,
+      pipeline_review_required: lead.pipeline_review_required ?? false,
+      origem_comercial: lead.origem_comercial || null,
+      indicado_por: lead.indicado_por?.trim() || null,
+      tipo_conta_comercial: lead.tipo_conta_comercial || null,
+      numero_corretores: lead.numero_corretores ?? null,
+      icp_confirmado: lead.icp_confirmado ?? null,
+      temperatura: lead.temperatura || null,
+      mrr_proposta: lead.mrr_proposta ?? null,
+      oferta_comercial: lead.oferta_comercial || null,
+      decisor_confirmado: lead.decisor_confirmado ?? false,
+      ganho_override_motivo: lead.ganho_override_motivo?.trim() || null,
+    } as any)
+    // a PK de leads e cnpj — nao existe coluna id (era a razao de o drag nunca salvar)
+    .eq("cnpj", lead.cnpj || lead.id)
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToLead(data);
+}
+
+export async function transitionLeadStage(
+  lead: Lead,
+  target: EstagioFunil,
+  context: TransitionContext = {},
+): Promise<Lead> {
+  const validation = validatePipelineTransition(lead, target, context);
+  if ("reason" in validation) throw new Error(validation.reason);
+
+  // Avanço livre (decisão CEO 01/09): o dropdown/Kanban pode setar qualquer etapa
+  // manualmente, inclusive Proposta Enviada / Aguardando Pagamento / Fechado Ganho.
+  // Os caminhos automáticos (API de proposta, aceite do termo, webhook de pagamento)
+  // continuam gravando esses estágios normalmente — só deixaram de ser exclusivos.
+  const patch: Record<string, unknown> = {
+    estagio_funil: target,
+    playbook_version: PLAYBOOK_VERSION,
+  };
+  if (context.nextStepAt !== undefined) patch.data_proximo_passo = context.nextStepAt;
+  if (context.lossReason !== undefined) patch.motivo_perda = context.lossReason;
+  if (context.lossReasonDetail !== undefined) patch.motivo_perda_detalhe = context.lossReasonDetail;
+  if (context.offer !== undefined) patch.oferta_comercial = context.offer;
+  if (context.managerOverride) {
+    patch.ganho_override_motivo = context.managerOverrideReason;
+  }
+
+  const { data, error } = await (supabase.from("leads") as any)
+    .update(patch)
+    .eq("cnpj", lead.cnpj || lead.id)
     .select()
     .single();
   if (error) throw error;
@@ -332,32 +480,18 @@ export async function updateLead(lead: Lead): Promise<Lead> {
 }
 
 export async function registrarReuniaoAgendada(
-  lead: Pick<Lead, "id" | "sdr_id" | "owner_id">,
-  userId?: string,
+  lead: Pick<Lead, "id" | "cnpj">,
+  _userId?: string,
   nota = "Status alterado manualmente para Reunião Agendada."
-): Promise<void> {
-  const { data: lastActivity, error: lastActivityError } = await supabase
-    .from("atividades")
-    .select("tipo_atividade, sdr_id, owner_id")
-    .eq("lead_id", lead.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (lastActivityError) throw lastActivityError;
-
-  const insertData: any = {
-    lead_id: lead.id,
-    tipo_atividade: lastActivity?.tipo_atividade || "Ligação",
-    resultado: "Agendou Reunião",
-    nota,
-  };
-
-  if (lead.owner_id || lastActivity?.owner_id) insertData.owner_id = lead.owner_id || lastActivity?.owner_id;
-  if (lead.sdr_id || lastActivity?.sdr_id || userId) insertData.sdr_id = lead.sdr_id || lastActivity?.sdr_id || userId;
-
-  const { error } = await supabase.from("atividades").insert(insertData);
+): Promise<Lead> {
+  const { data, error } = await supabase.rpc("confirm_existing_meeting" as never, {
+    p_lead_cnpj: lead.cnpj || lead.id,
+    p_nota: nota,
+  } as never);
   if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("O banco não confirmou a reunião.");
+  return rowToLead(row);
 }
 
 // ─── Status Counts ───────────────────────────────────────────
@@ -365,10 +499,11 @@ export async function getStatusCounts(cidade: string): Promise<Record<string, nu
   const { count: total, error: totalErr } = await supabase
     .from("leads")
     .select("*", { count: "exact", head: true })
-    .eq("cidade", cidade);
+    .eq("cidade", cidade)
+    .is("deleted_at", null);
   if (totalErr) throw totalErr;
 
-  const statuses = ["A Contatar", "Em Qualificação", "Reunião Agendada"];
+  const statuses = ["A Contatar", "Em Qualificação", "Qualificado", "Reunião Agendada", "Nurturing", "Opt-out"];
   const counts: Record<string, number> = { all: total ?? 0 };
 
   await Promise.all(
@@ -377,6 +512,7 @@ export async function getStatusCounts(cidade: string): Promise<Record<string, nu
         .from("leads")
         .select("*", { count: "exact", head: true })
         .eq("cidade", cidade)
+        .is("deleted_at", null)
         .eq("status_sdr", s);
       if (!error) counts[s] = count ?? 0;
     })
@@ -387,7 +523,8 @@ export async function getStatusCounts(cidade: string): Promise<Record<string, nu
     .from("leads")
     .select("*", { count: "exact", head: true })
     .eq("cidade", cidade)
-    .like("status_sdr", "Desqualificado%");
+    .is("deleted_at", null)
+    .eq("status_sdr", "Desqualificado");
   if (!desqErr) counts["Desqualificado"] = desqCount ?? 0;
 
   return counts;
@@ -575,11 +712,14 @@ export async function getSdrPerformance(cidade: string | null, days: number): Pr
 
 // ─── Audit: Reunião Inconsistencies ─────────────────────────
 export interface ReuniaoInconsistency {
-  id: string;
+  cnpj: string;
   fantasia: string | null;
   razao_social: string | null;
   cidade: string | null;
   created_at: string;
+  meeting_event_id: string | null;
+  data_reuniao_agendada: string | null;
+  reuniao_url: string | null;
 }
 
 export async function getReuniaoInconsistencies(cidade: string | null): Promise<ReuniaoInconsistency[]> {
@@ -632,8 +772,8 @@ export interface FollowupEntry {
   data_proximo_passo: string | null;
   observacoes_sdr: string | null;
   observacoes_closer: string | null;
-  owner_id: string | null;
-  sdr_id: string | null;
+  responsavel_sdr: string | null;
+  responsavel_closer: string | null;
   ultimo_contato_em: string | null;
   ultimo_contato_tipo: string | null;
 }
@@ -658,7 +798,7 @@ export async function reagendarFollowup(leadId: string, novaData: Date): Promise
   const { error } = await supabase
     .from("leads")
     .update({ data_proximo_passo: novaData.toISOString() })
-    .eq("id", leadId);
+    .eq("cnpj", leadId);
   if (error) throw error;
 }
 

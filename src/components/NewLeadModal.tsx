@@ -10,6 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UserPlus, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -17,62 +19,102 @@ interface Props {
   onCreated?: () => void;
 }
 
+// 25/08: CNPJ deixou de ser obrigatório — lead atendido no WhatsApp não tem CNPJ à mão.
+// Sem CNPJ, a RPC gera o código pela origem (WA-/IG-/IND-/CIMI-/MAN- + telefone) e
+// exige telefone. Com CNPJ, continua igual.
+const ORIGENS: { value: string; label: string; technical: string }[] = [
+  { value: "live", label: "Live", technical: "live_simbiose" },
+  { value: "diagnostico", label: "Diagnóstico", technical: "outros" },
+  { value: "outbound", label: "Outbound", technical: "outros" },
+  { value: "indicacao", label: "Indicação", technical: "indicacao" },
+  { value: "outros", label: "Outros", technical: "outros" },
+];
+
 export function NewLeadModal({ onCreated }: Props) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
+    origem: "outbound",
     cnpj: "",
     razao_social: "",
     fantasia: "",
+    contato_nome: "",
     cidade: "",
     uf: "",
     celular1: "",
     email1: "",
+    observacoes_sdr: "",
+    indicado_por: "",
+    tipo_conta_comercial: "",
+    numero_corretores: "",
+    icp_confirmado: "",
+    temperatura: "",
   });
 
   const update = (field: string, value: string) =>
     setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleSave = async () => {
-    if (!form.razao_social.trim()) {
-      toast({ title: "Campo obrigatório", description: "Razão Social é obrigatória.", variant: "destructive" });
+    const cnpj = form.cnpj.replace(/\D/g, "");
+    const fone = form.celular1.replace(/\D/g, "");
+    if (cnpj && cnpj.length !== 14) {
+      toast({ title: "CNPJ inválido", description: "Se informar CNPJ, ele precisa ter 14 dígitos — ou deixe em branco.", variant: "destructive" });
       return;
     }
-
-    // Check for duplicate CNPJ if provided
-    if (form.cnpj.trim()) {
-      const { data: existing } = await supabase
-        .from("leads")
-        .select("id")
-        .eq("cnpj", form.cnpj.trim())
-        .limit(1);
-      if (existing && existing.length > 0) {
-        toast({ title: "CNPJ já cadastrado", description: "Já existe um lead com esse CNPJ.", variant: "destructive" });
-        return;
-      }
+    if (!cnpj && fone.length < 10) {
+      toast({ title: "Campo obrigatório", description: "Sem CNPJ, informe o telefone com DDD (é ele que identifica o lead).", variant: "destructive" });
+      return;
+    }
+    const nomeEmpresa = form.razao_social.trim() || form.fantasia.trim() || form.contato_nome.trim();
+    if (!nomeEmpresa) {
+      toast({ title: "Campo obrigatório", description: "Informe a empresa ou, pelo menos, o nome da pessoa.", variant: "destructive" });
+      return;
     }
 
     setSaving(true);
     try {
-      const { error } = await supabase.from("leads").insert({
-        cnpj: form.cnpj.trim() || null,
-        razao_social: form.razao_social.trim(),
-        fantasia: form.fantasia.trim() || null,
-        cidade: form.cidade.trim().toUpperCase() || null,
-        uf: form.uf.trim().toUpperCase() || null,
-        celular1: form.celular1.trim() || null,
-        email1: form.email1.trim() || null,
-        status_sdr: "A Contatar",
-        status_cadencia: "ativo",
+      const { data, error } = await supabase.rpc("crm_create_manual_lead", {
+        p_cnpj: cnpj,  // string vazia = sem CNPJ (undefined faria o PostgREST não achar a função)
+        p_razao_social: nomeEmpresa,
+        p_fantasia: form.fantasia.trim() || undefined,
+        p_contato_nome: form.contato_nome.trim() || undefined,
+        p_cidade: form.cidade.trim() || undefined,
+        p_uf: form.uf.trim() || undefined,
+        p_celular: fone || undefined,
+        p_email: form.email1.trim() || undefined,
+        p_origem: ORIGENS.find((origem) => origem.value === form.origem)?.technical || "outros",
+        p_observacoes: form.observacoes_sdr.trim() || undefined,
       });
       if (error) throw error;
 
-      toast({ title: "✅ Lead cadastrado!", description: `${form.razao_social} adicionado com sucesso.` });
-      setForm({ cnpj: "", razao_social: "", fantasia: "", cidade: "", uf: "", celular1: "", email1: "" });
+      const codigo = (data as { cnpj?: string } | null)?.cnpj;
+      if (codigo) {
+        const { error: commercialError } = await (supabase.from("leads") as any)
+          .update({
+            origem_comercial: form.origem,
+            indicado_por: form.indicado_por.trim() || null,
+            tipo_conta_comercial: form.tipo_conta_comercial || null,
+            numero_corretores: form.numero_corretores === "" ? null : Number(form.numero_corretores),
+            icp_confirmado: form.icp_confirmado === "" ? null : form.icp_confirmado === "sim",
+            temperatura: form.temperatura || null,
+          })
+          .eq("cnpj", codigo);
+        if (commercialError) throw commercialError;
+      }
+      toast({ title: "✅ Lead cadastrado!", description: `${nomeEmpresa} adicionado${codigo ? ` (${codigo})` : ""}.` });
+      setForm({
+        origem: "outbound", cnpj: "", razao_social: "", fantasia: "", contato_nome: "", cidade: "", uf: "",
+        celular1: "", email1: "", observacoes_sdr: "", indicado_por: "", tipo_conta_comercial: "",
+        numero_corretores: "", icp_confirmado: "", temperatura: "",
+      });
       setOpen(false);
       onCreated?.();
-    } catch (err: any) {
-      toast({ title: "Erro ao cadastrar", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      toast({
+        title: "Erro ao cadastrar",
+        description: err instanceof Error ? err.message : "Não foi possível cadastrar o lead.",
+        variant: "destructive",
+      });
     } finally {
       setSaving(false);
     }
@@ -83,25 +125,81 @@ export function NewLeadModal({ onCreated }: Props) {
       <DialogTrigger asChild>
         <Button className="gap-1.5">
           <UserPlus className="h-4 w-4" />
-          Cadastrar Lead Manual
+          Novo lead
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[480px]">
         <DialogHeader>
-          <DialogTitle>Cadastrar Nova Empresa</DialogTitle>
+          <DialogTitle>Cadastrar novo lead</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
           <div className="space-y-1.5">
-            <Label htmlFor="cnpj">CNPJ <span className="text-muted-foreground text-xs">(opcional)</span></Label>
-            <Input id="cnpj" placeholder="00.000.000/0001-00" value={form.cnpj} onChange={(e) => update("cnpj", e.target.value)} />
+            <Label htmlFor="origem">Como chegou <span className="text-destructive">*</span></Label>
+            <Select value={form.origem} onValueChange={(v) => update("origem", v)}>
+              <SelectTrigger id="origem"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {ORIGENS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          {form.origem === "indicacao" && (
+            <div className="space-y-1.5">
+              <Label htmlFor="indicado_por">Quem indicou</Label>
+              <Input id="indicado_por" placeholder="Pessoa ou empresa" value={form.indicado_por} onChange={(e) => update("indicado_por", e.target.value)} />
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Tipo de conta</Label>
+              <Select value={form.tipo_conta_comercial} onValueChange={(v) => update("tipo_conta_comercial", v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="imobiliaria">Imobiliária</SelectItem>
+                  <SelectItem value="incorporadora">Incorporadora</SelectItem>
+                  <SelectItem value="loteadora">Loteadora</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Nº de corretores</Label>
+              <Input type="number" min={0} value={form.numero_corretores} onChange={(e) => update("numero_corretores", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>ICP</Label>
+              <Select value={form.icp_confirmado} onValueChange={(v) => update("icp_confirmado", v)}>
+                <SelectTrigger><SelectValue placeholder="Avaliar" /></SelectTrigger>
+                <SelectContent><SelectItem value="sim">Sim</SelectItem><SelectItem value="nao">Não</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Temperatura</Label>
+              <Select value={form.temperatura} onValueChange={(v) => update("temperatura", v)}>
+                <SelectTrigger><SelectValue placeholder="Classificar" /></SelectTrigger>
+                <SelectContent><SelectItem value="quente">Quente</SelectItem><SelectItem value="morno">Morno</SelectItem><SelectItem value="frio">Frio</SelectItem></SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="razao_social">Razão Social <span className="text-destructive">*</span></Label>
-            <Input id="razao_social" placeholder="Nome da empresa" value={form.razao_social} onChange={(e) => update("razao_social", e.target.value)} />
+            <Label htmlFor="celular1">Telefone / WhatsApp <span className="text-destructive">*</span></Label>
+            <Input id="celular1" placeholder="(11) 99999-9999" value={form.celular1} onChange={(e) => update("celular1", e.target.value)} />
+            <p className="text-xs text-muted-foreground">Sem CNPJ, é o telefone que identifica o lead. Se já existir ficha com esse número, o sistema avisa.</p>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="fantasia">Nome Fantasia</Label>
-            <Input id="fantasia" placeholder="Nome fantasia" value={form.fantasia} onChange={(e) => update("fantasia", e.target.value)} />
+            <Label htmlFor="contato_nome">Pessoa de contato</Label>
+            <Input id="contato_nome" placeholder="Nome de quem falou com a gente" value={form.contato_nome} onChange={(e) => update("contato_nome", e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="razao_social">Empresa / imobiliária</Label>
+            <Input id="razao_social" placeholder="Nome da empresa (ou deixe em branco se ainda não souber)" value={form.razao_social} onChange={(e) => update("razao_social", e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="fantasia">Nome fantasia</Label>
+            <Input id="fantasia" placeholder="Como a empresa é conhecida" value={form.fantasia} onChange={(e) => update("fantasia", e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="cnpj">CNPJ <span className="text-xs font-normal text-muted-foreground">(opcional)</span></Label>
+            <Input id="cnpj" placeholder="00.000.000/0001-00 — só se tiver" value={form.cnpj} onChange={(e) => update("cnpj", e.target.value)} />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2 space-y-1.5">
@@ -114,12 +212,12 @@ export function NewLeadModal({ onCreated }: Props) {
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="celular1">Telefone / Celular</Label>
-            <Input id="celular1" placeholder="(11) 99999-9999" value={form.celular1} onChange={(e) => update("celular1", e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
             <Label htmlFor="email1">E-mail</Label>
             <Input id="email1" type="email" placeholder="email@empresa.com" value={form.email1} onChange={(e) => update("email1", e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="observacoes_sdr">Contexto inicial</Label>
+            <Textarea id="observacoes_sdr" rows={3} placeholder="Como chegou, interesse ou próximo passo..." value={form.observacoes_sdr} onChange={(e) => update("observacoes_sdr", e.target.value)} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>

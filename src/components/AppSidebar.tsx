@@ -16,7 +16,8 @@ import { NavLink } from "@/components/NavLink";
 import { Button } from "@/components/ui/button";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import {
-  Crosshair, List, Columns3, BarChart3, LogOut, Building2, Megaphone, CalendarClock, Phone,
+  Crosshair, List, Columns3, BarChart3, BookOpen, LogOut, Building2, Megaphone, CalendarClock, Phone, Sparkles, Home, Activity,
+  MessageSquare, Instagram, ListChecks, Clapperboard,
 } from "lucide-react";
 
 interface NavItem {
@@ -25,28 +26,36 @@ interface NavItem {
   icon: React.ElementType;
 }
 
+const NEW_ITEMS: NavItem[] = [
+  { title: "Plano do Sprint", url: "/plano", icon: ListChecks },
+  { title: "Criativos", url: "/criativos", icon: Clapperboard },
+  { title: "Desempenho", url: "/campanhas", icon: BarChart3 },
+  { title: "Metas do Dia", url: "/metas", icon: Crosshair },
+  { title: "Conversas", url: "/conversas", icon: MessageSquare },
+  { title: "Social Selling", url: "/social-selling", icon: Instagram },
+  { title: "Leads", url: "/leads", icon: Sparkles },
+  { title: "Playbook", url: "/playbook", icon: BookOpen },
+];
+
 const SDR_ITEMS: NavItem[] = [
+  ...NEW_ITEMS,
   { title: "Foco de Hoje", url: "/sdr", icon: Crosshair },
-  { title: "Explorador", url: "/sdr/explorador", icon: List },
   { title: "Anúncios", url: "/sdr/anuncios", icon: Megaphone },
-  { title: "Ligações", url: "/ligacoes", icon: Phone },
-  { title: "Follow-ups", url: "/follow-ups", icon: CalendarClock },
 ];
 
 const CLOSER_ITEMS: NavItem[] = [
+  // Social Selling sai: a rota só aceita sdr/manager, então o item levava o
+  // closer a um redirect de volta pro pipeline (parecia link quebrado).
+  ...NEW_ITEMS.filter((i) => i.url !== "/social-selling"),
   { title: "Pipeline", url: "/closer", icon: Columns3 },
-  { title: "Explorador", url: "/closer/explorador", icon: List },
-  { title: "Ligações", url: "/ligacoes", icon: Phone },
-  { title: "Follow-ups", url: "/follow-ups", icon: CalendarClock },
 ];
 
 const MANAGER_ITEMS: NavItem[] = [
-  { title: "Analytics", url: "/manager", icon: BarChart3 },
+  ...NEW_ITEMS,
+  { title: "Painel do Gerente", url: "/manager/painel", icon: BarChart3 },
   { title: "Cadência SDR", url: "/manager/cadencia", icon: Crosshair },
   { title: "Pipeline Closer", url: "/manager/pipeline", icon: Columns3 },
-  { title: "Explorador", url: "/manager/explorador", icon: List },
-  { title: "Ligações", url: "/ligacoes", icon: Phone },
-  { title: "Follow-ups", url: "/follow-ups", icon: CalendarClock },
+  { title: "Saúde do Sistema", url: "/manager/sistema", icon: Activity },
 ];
 
 const ROLE_LABELS: Record<AppRole, string> = {

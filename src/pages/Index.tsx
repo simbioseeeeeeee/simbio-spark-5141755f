@@ -16,7 +16,7 @@ export default function Index() {
   if (!user) return <Navigate to="/login" replace />;
   if (role === "sdr") return <Navigate to="/sdr" replace />;
   if (role === "closer") return <Navigate to="/closer" replace />;
-  if (role === "manager") return <Navigate to="/manager" replace />;
+  if (role === "manager") return <Navigate to="/manager/pipeline" replace />;
 
   return <Navigate to="/login" replace />;
 }

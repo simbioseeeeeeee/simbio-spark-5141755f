@@ -10,7 +10,7 @@ import { ptBR } from "date-fns/locale";
 interface Notification {
   id: string;
   lead_name: string;
-  lead_id: string;
+  lead_cnpj: string;
   created_at: string;
   read: boolean;
 }
@@ -20,17 +20,17 @@ export function NotificationsPanel() {
   const [open, setOpen] = useState(false);
 
   const loadNotifications = useCallback(async () => {
-    // Load recent activities where resultado = 'Agendou Reunião' (last 30 days)
+    // O banco registra reunião com os enums minúsculos reuniao/agendado.
     const since = new Date();
     since.setDate(since.getDate() - 30);
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase
       .from("atividades")
-      .select("id, lead_id, created_at, resultado")
-      .eq("resultado", "Agendou Reunião")
+      .select("id, lead_cnpj, created_at, resultado")
+      .eq("resultado", "agendado")
       .gte("created_at", since.toISOString())
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(50) as any);
 
     if (error) {
       console.error("Error loading notifications:", error);
@@ -43,22 +43,23 @@ export function NotificationsPanel() {
     }
 
     // Get lead names
-    const leadIds = [...new Set(data.map((a) => a.lead_id))];
-    const { data: leads } = await supabase
+    const leadCnpjs = [...new Set(data.map((a: any) => a.lead_cnpj))] as string[];
+    const { data: leads } = await (supabase
       .from("leads")
-      .select("id, fantasia, razao_social")
-      .in("id", leadIds);
+      .select("cnpj, fantasia, razao_social")
+      .is("deleted_at", null)
+      .in("cnpj", leadCnpjs) as any);
 
-    const leadMap = new Map((leads || []).map((l) => [l.id, l.fantasia || l.razao_social || "Lead"]));
+    const leadMap = new Map((leads || []).map((l: any) => [l.cnpj, l.fantasia || l.razao_social || "Lead"]));
 
     // Check which ones were read from localStorage
     const readIds = JSON.parse(localStorage.getItem("read_notifications") || "[]") as string[];
 
     setNotifications(
-      data.map((a) => ({
+      data.map((a: any) => ({
         id: a.id,
-        lead_name: leadMap.get(a.lead_id) || "Lead",
-        lead_id: a.lead_id,
+        lead_name: leadMap.get(a.lead_cnpj) || "Lead",
+        lead_cnpj: a.lead_cnpj,
         created_at: a.created_at,
         read: readIds.includes(a.id),
       }))
@@ -77,7 +78,7 @@ export function NotificationsPanel() {
         event: "INSERT",
         schema: "public",
         table: "atividades",
-        filter: "resultado=eq.Agendou Reunião",
+        filter: "resultado=eq.agendado",
       }, () => {
         loadNotifications();
       })

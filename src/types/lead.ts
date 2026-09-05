@@ -1,9 +1,51 @@
-export type LeadStatus = "A Contatar" | "Em Qualificação" | "Reunião Agendada" | "Desqualificado" | "Desqualificado - Sem Perfil" | "Desqualificado - Sem Budget" | "Desqualificado - Sem Interesse";
+export const PLAYBOOK_VERSION = "simbiose-sales-v2@2.1.0" as const;
+export const CATALOG_VERSION = "2.1.0" as const;
 
-export type EstagioFunil = "Reunião Agendada" | "Reunião Realizada" | "Proposta Enviada" | "Em Negociação" | "Fechado Ganho" | "Fechado Perdido";
+// Espelha o CHECK leads_status_sdr_chk. "Prospectado" é como o
+// facebook-webhook cria todo lead de campanha; "Arquivo Morto" e "Cliente
+// Ativo" são legados da base — sem eles a matriz de transição fica undefined
+// e a ficha do lead quebra ao abrir.
+export type LeadStatus =
+  | "A Contatar"
+  | "Prospectado"
+  | "Em Qualificação"
+  | "Qualificado"
+  | "Reunião Agendada"
+  | "Nurturing"
+  | "Desqualificado"
+  | "Opt-out"
+  | "Arquivo Morto"
+  | "Cliente Ativo";
 
-export type TipoAtividade = "WhatsApp" | "Ligação" | "Email" | "Pesquisa" | "Visita";
-export type ResultadoAtividade = "Conectado" | "Atendeu" | "Respondeu" | "Não Atendeu" | "Caixa Postal" | "Sem Resposta" | "Agendou Reunião" | "Recusou" | "Pesquisa Concluída";
+export type EstagioFunil =
+  | "Reunião Agendada"
+  | "Diagnóstico Realizado"
+  | "Proposta Enviada"
+  | "Em Negociação"
+  | "Aguardando Aceite"
+  | "Aguardando Pagamento"
+  | "Fechado Ganho"
+  | "No-show"
+  | "Nurturing"
+  | "Desqualificado"
+  | "Opt-out"
+  | "Fechado Perdido";
+
+export type OfertaComercial = "Imersão" | "Demanda" | "Atendimento com IA" | "Operação de Vendas";
+export type OfferId = "imersao" | "demanda" | "atendimento_ia" | "operacao_vendas";
+export type Commitment = "unico" | "mensal" | "trimestral" | "anual";
+export type MotivoPerda =
+  | "sem_fit"
+  | "prioridade_timing"
+  | "investimento"
+  | "veto_decisor"
+  | "concorrente"
+  | "desistencia"
+  | "outro";
+export type PaymentStatus = "nao_iniciado" | "aguardando" | "pago" | "vencido" | "cancelado";
+export type OrigemComercial = "live" | "diagnostico" | "outbound" | "indicacao" | "outros";
+export type TipoContaComercial = "imobiliaria" | "incorporadora" | "loteadora" | "outro";
+export type TemperaturaLead = "quente" | "morno" | "frio";
 
 export interface Socio {
   nome: string;
@@ -14,7 +56,75 @@ export interface Socio {
   email1?: string;
 }
 
-export type CanalPreferido = "whatsapp" | "telefone" | "email" | "linkedin" | "nao_definido";
+export type OrigemLead =
+  | "receita_federal"
+  | "bitrix_migrado"
+  | "whatsapp_entrante"
+  | "facebook_ads"
+  | "whatsapp_uchat"
+  | "instagram_manual"
+  | "live_simbiose"
+  | "evento_cimi360"
+  | "teste"
+  | "outros";
+
+export type TipoLead =
+  | "imobiliaria_rf"
+  | "programa_acelerador"
+  | "b2b_simbiose"
+  | "lead_outros";
+
+export const ORIGEM_OPTIONS: { value: OrigemLead; label: string }[] = [
+  { value: "receita_federal", label: "Receita Federal" },
+  { value: "bitrix_migrado", label: "Bitrix Migrado" },
+  { value: "whatsapp_entrante", label: "WhatsApp Entrante" },
+  { value: "facebook_ads", label: "Facebook Ads" },
+  { value: "whatsapp_uchat", label: "WhatsApp UChat" },
+  { value: "instagram_manual", label: "Instagram manual" },
+  { value: "live_simbiose", label: "Live Simbiose" },
+  { value: "evento_cimi360", label: "Evento CIMI360" },
+  { value: "teste", label: "Teste" },
+];
+
+export const TIPO_OPTIONS: { value: TipoLead; label: string }[] = [
+  { value: "imobiliaria_rf", label: "Imobiliária (RF)" },
+  { value: "programa_acelerador", label: "Programa Acelerador" },
+  { value: "b2b_simbiose", label: "B2B Simbiose" },
+  { value: "lead_outros", label: "Outros" },
+];
+
+export const ORIGEM_BADGE_CLASS: Record<string, string> = {
+  receita_federal: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30",
+  bitrix_migrado: "bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/30",
+  whatsapp_entrante: "bg-green-500/15 text-green-700 dark:text-green-300 border border-green-500/30",
+  facebook_ads: "bg-pink-500/15 text-pink-700 dark:text-pink-300 border border-pink-500/30",
+  whatsapp_uchat: "bg-green-500/15 text-green-700 dark:text-green-300 border border-green-500/30",
+  instagram_manual: "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300 border border-fuchsia-500/30",
+  live_simbiose: "bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-500/30",
+  evento_cimi360: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30",
+  teste: "bg-muted text-muted-foreground border",
+  outros: "bg-muted text-muted-foreground border",
+};
+
+export const ORIGEM_LABEL: Record<string, string> = {
+  receita_federal: "Receita Federal",
+  bitrix_migrado: "Bitrix",
+  whatsapp_entrante: "WhatsApp",
+  facebook_ads: "Facebook Ads",
+  whatsapp_uchat: "WhatsApp UChat",
+  instagram_manual: "Instagram",
+  live_simbiose: "Live Simbiose",
+  evento_cimi360: "Evento CIMI360",
+  teste: "Teste",
+  outros: "Outros",
+};
+
+export const TIPO_LABEL: Record<string, string> = {
+  imobiliaria_rf: "Imobiliária (RF)",
+  programa_acelerador: "Acelerador",
+  b2b_simbiose: "B2B Simbiose",
+  lead_outros: "Outros",
+};
 
 export interface Lead {
   id: string;
@@ -48,91 +158,175 @@ export interface Lead {
   whatsapp_humano: boolean;
   observacoes_sdr: string;
   estagio_funil: EstagioFunil | null;
-  valor_negocio_estimado: number | null;
   data_proximo_passo: string | null;
   observacoes_closer: string;
   pesquisa_realizada: boolean;
   lead_score: number | null;
-  dia_cadencia: number;
   status_cadencia: string;
   created_at: string;
-  owner_id?: string | null;
-  sdr_id?: string | null;
-  canal_preferido?: CanalPreferido;
+  updated_at?: string | null;
+  origem_lead?: string | null;
+  tipo_lead?: string | null;
+  origem_comercial?: OrigemComercial | null;
+  indicado_por?: string | null;
+  tipo_conta_comercial?: TipoContaComercial | null;
+  numero_corretores?: number | null;
+  icp_confirmado?: boolean | null;
+  temperatura?: TemperaturaLead | null;
+  mrr_proposta?: number | null;
+  proposta_realizada_em?: string | null;
+  proposta_aprovada_em?: string | null;
+  proposta_assinada_em?: string | null;
+  reuniao_realizada_em?: string | null;
+  no_show_em?: string | null;
+  // Campos reais do Supabase mdewbruvzrrxezsbyzmq (snake_case)
+  responsavel_sdr?: string | null;
+  responsavel_closer?: string | null;
+  motivo_perda?: string | null;
+  motivo_perda_detalhe?: string | null;
+  meeting_event_id?: string | null;
+  data_reuniao_agendada?: string | null;
+  reuniao_url?: string | null;
+  stage_changed_at?: string | null;
+  playbook_version?: string | null;
+  fit_score?: number | null;
+  fit_score_breakdown?: Record<string, number> | null;
+  execution_score?: number | null;
+  decisor_confirmado?: boolean;
+  oferta_comercial?: OfertaComercial | null;
+  proposta_enviada_em?: string | null;
+  aceite_em?: string | null;
+  payment_status?: PaymentStatus | null;
+  pagamento_em?: string | null;
+  ganho_override_em?: string | null;
+  ganho_override_motivo?: string | null;
+  pipeline_review_required?: boolean;
+  no_show_reagenda_tentativas?: number;
+  tentativas_followup?: number | null;
+  data_ultimo_contato?: string | null;
+  qtde_funcionarios?: number | null;
+  cnae?: string | null;
+  cnae_grupo?: string | null;
+  cnae_setor?: string | null;
+  tipo_empresa?: string | null;
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  deletion_reason?: string | null;
 }
 
 export interface Atividade {
   id: string;
-  lead_id: string;
-  tipo_atividade: TipoAtividade;
-  resultado: ResultadoAtividade;
+  lead_cnpj: string;
+  tipo_atividade: string;
+  resultado: string;
   nota: string;
   created_at: string;
-  sdr_id?: string | null;
+  created_by?: string | null;
+  playbook_version?: string;
+  message_key?: string | null;
+  origem?: string | null;
+  canal?: string | null;
+  metadados?: Record<string, unknown>;
 }
 
 export const STATUS_OPTIONS: LeadStatus[] = [
   "A Contatar",
+  "Prospectado",
   "Em Qualificação",
+  "Qualificado",
   "Reunião Agendada",
+  "Nurturing",
   "Desqualificado",
-  "Desqualificado - Sem Perfil",
-  "Desqualificado - Sem Budget",
-  "Desqualificado - Sem Interesse",
+  "Opt-out",
 ];
 
 export const ESTAGIO_FUNIL_OPTIONS: EstagioFunil[] = [
   "Reunião Agendada",
-  "Reunião Realizada",
+  "Diagnóstico Realizado",
   "Proposta Enviada",
   "Em Negociação",
+  "Aguardando Aceite",
+  "Aguardando Pagamento",
   "Fechado Ganho",
+  "No-show",
+  "Nurturing",
+  "Desqualificado",
+  "Opt-out",
   "Fechado Perdido",
 ];
 
-export const TIPO_ATIVIDADE_OPTIONS: TipoAtividade[] = ["WhatsApp", "Ligação", "Email", "Pesquisa", "Visita"];
+export const ESTAGIO_LABEL: Record<EstagioFunil, string> = {
+  "Reunião Agendada": "Reunião agendada",
+  "Diagnóstico Realizado": "Reunião realizada",
+  "Proposta Enviada": "Proposta realizada",
+  "Em Negociação": "Em negociação",
+  "Aguardando Aceite": "Proposta aprovada",
+  "Aguardando Pagamento": "Proposta assinada / fechamento",
+  "Fechado Ganho": "Fechado ganho",
+  "No-show": "No-show",
+  "Nurturing": "Nurturing",
+  "Desqualificado": "Desqualificado",
+  "Opt-out": "Opt-out",
+  "Fechado Perdido": "Fechado perdido",
+};
 
-export const RESULTADO_OPTIONS: ResultadoAtividade[] = [
-  "Conectado", "Atendeu", "Respondeu", "Não Atendeu",
-  "Caixa Postal", "Sem Resposta", "Agendou Reunião", "Recusou", "Pesquisa Concluída",
+export function estagioLabel(stage?: string | null): string {
+  return stage && stage in ESTAGIO_LABEL
+    ? ESTAGIO_LABEL[stage as EstagioFunil]
+    : stage || "Sem etapa";
+}
+
+export const ORIGEM_COMERCIAL_LABEL: Record<OrigemComercial, string> = {
+  live: "Live",
+  diagnostico: "Diagnóstico",
+  outbound: "Outbound",
+  indicacao: "Indicação",
+  outros: "Outros",
+};
+
+export const OFERTA_OPTIONS: { id: OfferId; label: OfertaComercial }[] = [
+  { id: "imersao", label: "Imersão" },
+  { id: "demanda", label: "Demanda" },
+  { id: "atendimento_ia", label: "Atendimento com IA" },
+  { id: "operacao_vendas", label: "Operação de Vendas" },
 ];
+
+export const MOTIVO_PERDA_LABEL: Record<MotivoPerda, string> = {
+  sem_fit: "Sem fit",
+  prioridade_timing: "Prioridade / timing",
+  investimento: "Investimento",
+  veto_decisor: "Veto do decisor",
+  concorrente: "Concorrente",
+  desistencia: "Desistência",
+  outro: "Outro",
+};
 
 export const STATUS_COLORS: Record<LeadStatus, string> = {
   "A Contatar": "bg-muted text-muted-foreground",
+  "Prospectado": "bg-warning/15 text-warning border border-warning/30",
+  "Arquivo Morto": "bg-muted text-muted-foreground border",
+  "Cliente Ativo": "bg-success/15 text-success border border-success/30",
   "Em Qualificação": "bg-warning/15 text-warning border border-warning/30",
+  "Qualificado": "bg-success/15 text-success border border-success/30",
   "Reunião Agendada": "bg-primary/15 text-primary border border-primary/30",
+  "Nurturing": "bg-muted text-muted-foreground border",
   "Desqualificado": "bg-destructive/15 text-destructive border border-destructive/30",
-  "Desqualificado - Sem Perfil": "bg-destructive/15 text-destructive border border-destructive/30",
-  "Desqualificado - Sem Budget": "bg-destructive/15 text-destructive border border-destructive/30",
-  "Desqualificado - Sem Interesse": "bg-destructive/15 text-destructive border border-destructive/30",
+  "Opt-out": "bg-destructive/15 text-destructive border border-destructive/30",
 };
 
 export const ESTAGIO_COLORS: Record<EstagioFunil, string> = {
   "Reunião Agendada": "bg-primary/15 text-primary",
-  "Reunião Realizada": "bg-warning/15 text-warning",
+  "Diagnóstico Realizado": "bg-warning/15 text-warning",
   "Proposta Enviada": "bg-primary/15 text-primary",
   "Em Negociação": "bg-warning/15 text-warning",
+  "Aguardando Aceite": "bg-warning/15 text-warning",
+  "Aguardando Pagamento": "bg-warning/15 text-warning",
   "Fechado Ganho": "bg-success/15 text-success",
+  "No-show": "bg-destructive/15 text-destructive",
+  "Nurturing": "bg-muted text-muted-foreground",
+  "Desqualificado": "bg-destructive/15 text-destructive",
+  "Opt-out": "bg-destructive/15 text-destructive",
   "Fechado Perdido": "bg-destructive/15 text-destructive",
-};
-
-// Cadence step definitions (day -> action description)
-export const CADENCE_STEPS: Record<number, string> = {
-  0: "Primeira Tentativa de Contato",
-  1: "Enviar WhatsApp #1",
-  2: "Ligar para o Lead",
-  3: "Enviar WhatsApp #2",
-  4: "Ligar novamente",
-  5: "Enviar Email",
-  6: "WhatsApp de Follow-up",
-  7: "Ligar com abordagem diferente",
-  8: "WhatsApp Final",
-  9: "Última tentativa (Ligar)",
-};
-
-// Gap between cadence steps (in days)
-export const CADENCE_GAPS: Record<number, number> = {
-  0: 0, 1: 1, 2: 1, 3: 2, 4: 2, 5: 3, 6: 2, 7: 3, 8: 2, 9: 3,
 };
 
 export function calculateScore(lead: Pick<Lead, 'possui_site' | 'instagram_ativo' | 'faz_anuncios' | 'whatsapp_automacao' | 'whatsapp_humano'>): number {

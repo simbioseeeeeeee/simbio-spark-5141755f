@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { Lead, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, ESTAGIO_COLORS, Atividade } from "@/types/lead";
-import { getKanbanLeads, updateLead, getLeadAtividades, getLeadsLastContact, LastContactInfo } from "@/store/leads-store";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Lead, ESTAGIO_FUNIL_OPTIONS, EstagioFunil, ESTAGIO_COLORS, estagioLabel } from "@/types/lead";
+import { getKanbanLeads, transitionLeadStage, getLeadsLastContact, LastContactInfo, rowToLead } from "@/store/leads-store";
 import { supabase } from "@/integrations/supabase/client";
 import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Loader2 } from "lucide-react";
@@ -8,6 +8,8 @@ import { toast } from "@/hooks/use-toast";
 import { PipelineCard } from "./closer/PipelineCard";
 import { PipelineColumn } from "./closer/PipelineColumn";
 import { PipelineFilters, PipelineFilterValues } from "./closer/PipelineFilters";
+import { PipelineScrollToolbar } from "./pipeline/PipelineScrollToolbar";
+import { errorMessage } from "@/lib/api-error";
 
 interface Props {
   territorio?: string;
@@ -18,9 +20,10 @@ const COLUMNS: EstagioFunil[] = ESTAGIO_FUNIL_OPTIONS;
 
 export function CloserPipeline({ territorio, onSelectLead }: Props) {
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [atividades, setAtividades] = useState<Record<string, Atividade[]>>({});
   const [lastContacts, setLastContacts] = useState<Map<string, LastContactInfo>>(new Map());
   const [loading, setLoading] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const movingLeadsRef = useRef(new Set<string>());
   const [filters, setFilters] = useState<PipelineFilterValues>({
     search: "",
     scoreFilter: "all",
@@ -36,22 +39,15 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
     try {
       const data = await getKanbanLeads(territorio);
       setLeads(data);
-      const atvsMap: Record<string, Atividade[]> = {};
-      await Promise.all(
-        data.slice(0, 50).map(async (lead) => {
-          try {
-            atvsMap[lead.id] = await getLeadAtividades(lead.id, 3);
-          } catch { atvsMap[lead.id] = []; }
-        })
-      );
-      setAtividades(atvsMap);
-      // Fetch last contacts
+      // Uma RPC em lote substitui as antigas 50 consultas individuais de atividade.
       if (data.length > 0) {
         const contacts = await getLeadsLastContact(data.map((l) => l.id));
         setLastContacts(contacts);
+      } else {
+        setLastContacts(new Map());
       }
-    } catch (err: any) {
-      toast({ title: "Erro ao carregar pipeline", description: err.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Erro ao carregar pipeline", description: errorMessage(error, "Atualize a página e tente novamente."), variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -59,34 +55,45 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Realtime: listen for leads moving to "Reunião Agendada"
+  // Realtime: reconcilia a linha recebida sem recarregar o Kanban inteiro. Antes
+  // cada UPDATE disparava dezenas de requests; salvar uma ficha podia fazer três
+  // UPDATEs seguidos e deixar a interface presa em cargas concorrentes.
   useEffect(() => {
     const channel = supabase
       .channel('closer-pipeline-realtime')
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'leads', filter: 'status_sdr=eq.Reunião Agendada' },
+        { event: 'UPDATE', schema: 'public', table: 'leads' },
         (payload) => {
-          const newLead = payload.new as any;
-          const oldLead = payload.old as any;
+          const newLead = payload.new as Record<string, unknown>;
+          const oldLead = payload.old as Record<string, unknown>;
           if (oldLead?.status_sdr !== 'Reunião Agendada' && newLead?.status_sdr === 'Reunião Agendada') {
-            const nome = newLead.fantasia || newLead.razao_social || 'Lead';
+            const nome = String(newLead.fantasia || newLead.razao_social || 'Lead');
             toast({
               title: "🔔 Nova Reunião Agendada!",
-              description: `${nome} (${newLead.cidade || '—'}) foi movido para o pipeline.`,
+              description: `${nome} (${String(newLead.cidade || '—')}) foi movido para o pipeline.`,
             });
             try {
               const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbsGczJjmEw9jUhkMtPXmv0NmcUjhHcKXM2qpfO0pvn8XYsmY+TGueyNS1d0NMdJ7B0bVxREhribrSuXlJUHWXvM+5eElQdJa7z7lwSlF2mL3PuXNLUnabvs+5c0pQdJe80LpyS1J2mLzPuXBKUHSXvM+5');
               audio.volume = 0.3;
-              audio.play().catch(() => {});
-            } catch {}
-            loadData();
+              void audio.play().catch(() => undefined);
+            } catch (error: unknown) {
+              console.warn("[closer-pipeline] alerta sonoro indisponível", error);
+            }
           }
+          const updated = rowToLead(newLead);
+          const belongsToPipeline = !updated.deleted_at
+            && (updated.status_sdr === "Reunião Agendada" || Boolean(updated.estagio_funil))
+            && (!territorio || updated.cidade === territorio);
+          setLeads((current) => {
+            const withoutUpdated = current.filter((item) => item.cnpj !== updated.cnpj);
+            return belongsToPipeline ? [updated, ...withoutUpdated] : withoutUpdated;
+          });
         }
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [loadData]);
+  }, [territorio]);
 
   // Apply filters & sorting
   const filteredLeads = useMemo(() => {
@@ -102,12 +109,11 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
       );
     }
 
-    if (filters.scoreFilter === "high") result = result.filter((l) => (l.lead_score ?? 0) >= 70);
-    else if (filters.scoreFilter === "medium") result = result.filter((l) => (l.lead_score ?? 0) >= 40 && (l.lead_score ?? 0) < 70);
-    else if (filters.scoreFilter === "low") result = result.filter((l) => (l.lead_score ?? 0) < 40);
+    if (filters.scoreFilter === "qualified") result = result.filter((l) => (l.fit_score ?? 0) >= 70);
+    else if (filters.scoreFilter === "below") result = result.filter((l) => l.fit_score !== null && l.fit_score !== undefined && l.fit_score < 70);
+    else if (filters.scoreFilter === "unscored") result = result.filter((l) => l.fit_score === null || l.fit_score === undefined);
 
-    if (filters.sortBy === "score") result.sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0));
-    else if (filters.sortBy === "value") result.sort((a, b) => (b.valor_negocio_estimado ?? 0) - (a.valor_negocio_estimado ?? 0));
+    if (filters.sortBy === "fit") result.sort((a, b) => (b.fit_score ?? -1) - (a.fit_score ?? -1));
 
     return result;
   }, [leads, filters]);
@@ -121,15 +127,33 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
 
     const lead = leads.find((l) => l.id === leadId);
     if (!lead || lead.estagio_funil === newStage) return;
+    if (movingLeadsRef.current.has(leadId)) return;
 
-    setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, estagio_funil: newStage } : l)));
-
+    movingLeadsRef.current.add(leadId);
+    setLeads((current) => current.map((item) => (
+      item.id === leadId ? { ...item, estagio_funil: newStage } : item
+    )));
     try {
-      await updateLead({ ...lead, estagio_funil: newStage });
-      toast({ title: "Lead movido", description: `${lead.fantasia || lead.razao_social} → ${newStage}` });
-    } catch (err: any) {
-      setLeads((prev) => prev.map((l) => (l.id === leadId ? lead : l)));
-      toast({ title: "Erro ao mover", description: err.message, variant: "destructive" });
+      const updated = await transitionLeadStage(lead, newStage, {
+        eventId: lead.meeting_event_id,
+        meetingAt: lead.data_reuniao_agendada,
+        meetingUrl: lead.reuniao_url,
+        nextStepAt: lead.data_proximo_passo,
+        lossReason: lead.motivo_perda as any,
+        lossReasonDetail: lead.motivo_perda_detalhe,
+        offer: lead.oferta_comercial,
+      });
+      setLeads((prev) => prev.map((l) => (l.id === leadId ? updated : l)));
+      toast({ title: "Lead movido", description: `${lead.fantasia || lead.razao_social} → ${estagioLabel(newStage)}` });
+    } catch (error: unknown) {
+      setLeads((current) => current.map((item) => (item.id === leadId ? lead : item)));
+      toast({
+        title: "Não foi possível mover o lead",
+        description: errorMessage(error, "A etapa não foi alterada. Tente novamente."),
+        variant: "destructive",
+      });
+    } finally {
+      movingLeadsRef.current.delete(leadId);
     }
   };
 
@@ -140,15 +164,25 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
   return (
     <div className="space-y-2">
       <PipelineFilters filters={filters} onChange={setFilters} />
+      <PipelineScrollToolbar containerRef={scrollContainerRef} stages={COLUMNS} getStageLabel={estagioLabel} />
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="overflow-x-auto pb-4">
+        <div className="relative">
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-background to-transparent" aria-hidden="true" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-background to-transparent" aria-hidden="true" />
+        <div ref={scrollContainerRef} className="overflow-x-auto pb-4 scroll-smooth motion-reduce:scroll-auto">
           <div className="flex gap-4 min-w-max">
             {COLUMNS.map((col) => {
               const colLeads = filteredLeads.filter((l) => l.estagio_funil === col);
               const colorClass = ESTAGIO_COLORS[col] || "";
-              const totalValue = colLeads.reduce((sum, l) => sum + (l.valor_negocio_estimado ?? 0), 0);
               return (
-                <PipelineColumn key={col} id={col} colorClass={colorClass} count={colLeads.length} totalValue={totalValue}>
+                <PipelineColumn
+                  key={col}
+                  id={col}
+                  label={estagioLabel(col)}
+                  colorClass={colorClass}
+                  count={colLeads.length}
+                  mrrTotal={colLeads.reduce((sum, lead) => sum + (lead.mrr_proposta || 0), 0)}
+                >
                   {colLeads.map((lead) => {
                     const lc = lastContacts.get(lead.id);
                     return (
@@ -156,7 +190,7 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
                       key={lead.id}
                       lead={lead}
                       onClick={() => onSelectLead(lead)}
-                      atividades={atividades[lead.id] || []}
+                      atividades={[]}
                       ultimoContatoEm={lc?.ultimo_contato_em}
                       ultimoContatoTipo={lc?.ultimo_contato_tipo}
                     />
@@ -170,6 +204,7 @@ export function CloserPipeline({ territorio, onSelectLead }: Props) {
               );
             })}
           </div>
+        </div>
         </div>
       </DndContext>
     </div>

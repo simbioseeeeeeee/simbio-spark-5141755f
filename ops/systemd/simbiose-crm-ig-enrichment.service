@@ -1,0 +1,15 @@
+[Unit]
+Description=Simbiose CRM - pesquisa gradual de perfis Instagram por cidade
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/root/.env
+Environment=DRY_RUN=0
+Environment=IG_BATCH_SIZE=20
+ExecStart=/usr/bin/python3 -u /root/social_selling_ig_queue.py
+StandardOutput=append:/var/log/simbiose-crm-ig-enrichment.log
+StandardError=append:/var/log/simbiose-crm-ig-enrichment.log
+
+[Install]
+WantedBy=multi-user.target

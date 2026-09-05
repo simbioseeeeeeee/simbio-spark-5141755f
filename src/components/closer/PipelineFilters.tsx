@@ -33,10 +33,10 @@ export function PipelineFilters({ filters, onChange }: Props) {
           <SelectValue placeholder="Score" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Todos os scores</SelectItem>
-          <SelectItem value="high">Score ≥ 70</SelectItem>
-          <SelectItem value="medium">Score 40-69</SelectItem>
-          <SelectItem value="low">Score &lt; 40</SelectItem>
+          <SelectItem value="all">Todos os fits</SelectItem>
+          <SelectItem value="qualified">Fit ≥ 70</SelectItem>
+          <SelectItem value="below">Fit abaixo de 70</SelectItem>
+          <SelectItem value="unscored">Fit não avaliado</SelectItem>
         </SelectContent>
       </Select>
       <Select value={filters.sortBy} onValueChange={(v) => set("sortBy", v)}>
@@ -46,8 +46,7 @@ export function PipelineFilters({ filters, onChange }: Props) {
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="recent">Mais recente</SelectItem>
-          <SelectItem value="score">Maior score</SelectItem>
-          <SelectItem value="value">Maior valor</SelectItem>
+          <SelectItem value="fit">Maior fit</SelectItem>
         </SelectContent>
       </Select>
     </div>

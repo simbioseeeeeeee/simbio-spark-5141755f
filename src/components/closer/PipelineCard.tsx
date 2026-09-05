@@ -14,10 +14,16 @@ interface Props {
   ultimoContatoTipo?: string | null;
 }
 
+const ACTIVITY_LABEL: Record<string, string> = {
+  whatsapp_out: "WhatsApp", whatsapp_in: "WhatsApp recebido", ligacao: "Ligação",
+  email_out: "E-mail", email_in: "E-mail recebido", reuniao: "Reunião", nota: "Nota",
+  sucesso: "sucesso", agendado: "agendado", sem_resposta: "sem resposta",
+  recusa: "recusou", erro: "erro", escalado: "escalado",
+};
+
 function daysInStage(lead: Lead): number | null {
-  if (!lead.data_proximo_passo && !lead.created_at) return null;
-  const ref = lead.data_proximo_passo || lead.created_at;
-  const diff = Date.now() - new Date(ref).getTime();
+  if (!lead.stage_changed_at) return null;
+  const diff = Date.now() - new Date(lead.stage_changed_at).getTime();
   return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
 }
 
@@ -37,17 +43,19 @@ export function PipelineCard({ lead, onClick, atividades, ultimoContatoEm, ultim
       className="rounded-lg border border-border bg-card p-3 hover:border-primary/30 transition-colors space-y-2 group"
     >
       <div className="flex items-start gap-2">
-        <div
+        <button
+          type="button"
           {...listeners}
           {...attributes}
-          className="cursor-grab active:cursor-grabbing pt-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="min-h-6 min-w-6 cursor-grab rounded pt-0.5 text-muted-foreground opacity-60 transition-opacity hover:bg-muted hover:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
+          aria-label={`Arrastar ${lead.fantasia || lead.razao_social} para outra etapa`}
         >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
-        </div>
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={onClick}>
+          <GripVertical className="mx-auto h-4 w-4" aria-hidden="true" />
+        </button>
+        <button type="button" className="flex-1 min-w-0 cursor-pointer text-left" onClick={onClick}>
           <p className="font-medium text-sm truncate">{lead.fantasia || lead.razao_social}</p>
           <p className="text-xs text-muted-foreground truncate">{lead.bairro} · {lead.cidade || "—"}</p>
-        </div>
+        </button>
         {dias !== null && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -62,16 +70,22 @@ export function PipelineCard({ lead, onClick, atividades, ultimoContatoEm, ultim
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        {lead.lead_score !== null && (
-          <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-bold ${
-            lead.lead_score >= 70 ? "bg-success/15 text-success" : lead.lead_score >= 40 ? "bg-warning/15 text-warning" : "bg-destructive/15 text-destructive"
-          }`}>{lead.lead_score} pts</span>
-        )}
-        {lead.valor_negocio_estimado != null && lead.valor_negocio_estimado > 0 && (
-          <span className="text-xs text-muted-foreground font-medium">
-            R$ {lead.valor_negocio_estimado.toLocaleString("pt-BR")}
+        <span className="inline-flex rounded bg-primary/10 px-1.5 py-0.5 text-xs font-bold text-primary">
+          {lead.mrr_proposta == null
+            ? "MRR não informado"
+            : `${lead.mrr_proposta.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/mês`}
+        </span>
+        {lead.pipeline_review_required && (
+          <span className="inline-flex rounded bg-warning/15 px-1.5 py-0.5 text-xs font-medium text-warning">
+            revisar migração
           </span>
         )}
+        <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-bold ${
+          (lead.fit_score ?? 0) >= 70 ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
+        }`}>Fit {lead.fit_score ?? "—"}/100</span>
+        <span className="inline-flex rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+          Execução {lead.execution_score ?? "—"}/100
+        </span>
       </div>
 
       {/* Quick actions */}
@@ -85,6 +99,7 @@ export function PipelineCard({ lead, onClick, atividades, ultimoContatoEm, ultim
                 rel="noopener noreferrer"
                 className="p-1 rounded hover:bg-success/10 text-success"
                 onClick={(e) => e.stopPropagation()}
+                aria-label={`Abrir WhatsApp de ${lead.fantasia || lead.razao_social}`}
               >
                 <MessageCircle className="h-3.5 w-3.5" />
               </a>
@@ -99,6 +114,7 @@ export function PipelineCard({ lead, onClick, atividades, ultimoContatoEm, ultim
                 href={`tel:${phone}`}
                 className="p-1 rounded hover:bg-primary/10 text-primary"
                 onClick={(e) => e.stopPropagation()}
+                aria-label={`Ligar para ${lead.fantasia || lead.razao_social}`}
               >
                 <Phone className="h-3.5 w-3.5" />
               </a>
@@ -123,8 +139,8 @@ export function PipelineCard({ lead, onClick, atividades, ultimoContatoEm, ultim
         <div className="border-t border-border pt-2 space-y-1">
           {atividades.slice(0, 2).map((a) => (
             <div key={a.id} className="text-xs text-muted-foreground flex gap-1.5">
-              <span className="font-medium text-foreground/70">{a.tipo_atividade}</span>
-              <span>→ {a.resultado}</span>
+              <span className="font-medium text-foreground/70">{ACTIVITY_LABEL[a.tipo_atividade] || a.tipo_atividade}</span>
+              <span>→ {ACTIVITY_LABEL[a.resultado] || a.resultado}</span>
             </div>
           ))}
         </div>

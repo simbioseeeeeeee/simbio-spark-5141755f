@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Lead, STATUS_OPTIONS, CanalPreferido } from "@/types/lead";
+import { Lead, STATUS_OPTIONS } from "@/types/lead";
 import { getLeadsPaginated, LeadsResult, getLeadsLastContact, LastContactInfo } from "@/store/leads-store";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { Search, Loader2, ChevronLeft, ChevronRight, CheckCircle2, Bot, ArrowUpDown, Users, SlidersHorizontal, CalendarIcon, X, Phone, Mail, MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { lastContactColor, lastContactLabel, activityEmoji, CANAL_CONFIG } from "@/lib/contact-helpers";
+import { lastContactColor, lastContactLabel, activityEmoji } from "@/lib/contact-helpers";
 
 function ScoreCell({ score }: { score: number | null }) {
   if (score === null) return <span className="text-muted-foreground text-xs">—</span>;
@@ -22,7 +22,7 @@ function ScoreCell({ score }: { score: number | null }) {
   return <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold border ${color}`}>{score}</span>;
 }
 
-type QuickFilter = "todos" | "pesquisados" | "nao_pesquisados" | "qualificados" | "desqualificados";
+type QuickFilter = "todos" | "pesquisados" | "nao_pesquisados" | "digital_60" | "desqualificados";
 
 interface Props {
   territorio: string;
@@ -62,7 +62,7 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
       const data = await getLeadsPaginated({
         page, cidade: territorio, search: debouncedSearch, statusFilter,
         pesquisaFilter: pesquisaFilter === "pesquisados" ? "pesquisados" : pesquisaFilter === "nao_pesquisados" ? "nao_pesquisados" : undefined,
-        scoreFilter: pesquisaFilter === "qualificados" ? "qualificados" : undefined,
+        scoreFilter: pesquisaFilter === "digital_60" ? "pesquisa_digital_60" : undefined,
         desqualificadosFilter: pesquisaFilter === "desqualificados",
         sortByScore,
         dateFrom: dateFrom?.toISOString(),
@@ -101,7 +101,7 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
     { key: "todos", label: "Todos" },
     { key: "nao_pesquisados", label: "Não Pesquisados" },
     { key: "pesquisados", label: "Já Pesquisados" },
-    { key: "qualificados", label: "Score ≥ 60" },
+    { key: "digital_60", label: "Pesquisa digital ≥ 60" },
     { key: "desqualificados", label: "Desqualificados" },
   ];
 
@@ -125,7 +125,7 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
           {hasAdvancedFilters && <span className="ml-1 h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center">!</span>}
         </Button>
         <Button variant={sortByScore ? "default" : "outline"} size="sm" onClick={() => setSortByScore(!sortByScore)} className="ml-auto gap-1.5">
-          <ArrowUpDown className="h-3.5 w-3.5" /> Score
+          <ArrowUpDown className="h-3.5 w-3.5" /> Pesquisa digital
         </Button>
       </div>
 
@@ -182,7 +182,7 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
           {/* Score Range */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-muted-foreground">Faixa de Score</label>
+              <label className="text-xs font-medium text-muted-foreground">Faixa da pesquisa digital</label>
               <span className="text-xs font-mono text-foreground">{scoreRange[0]} – {scoreRange[1]}</span>
             </div>
             <Slider
@@ -233,16 +233,12 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
                   <TableHead className="w-[140px]">Celular</TableHead>
                    <TableHead className="w-[100px]">Bairro</TableHead>
                    <TableHead className="w-[90px]">Último</TableHead>
-                   <TableHead className="w-[70px]">Canal</TableHead>
-                   <TableHead className="w-[70px] text-center">Score</TableHead>
+                   <TableHead className="w-[110px] text-center">Pesquisa digital</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {result.leads.map((lead) => {
                   const lc = lastContacts.get(lead.id);
-                  const canal = lead.canal_preferido || "nao_definido";
-                  const canalCfg = CANAL_CONFIG[canal as CanalPreferido] || CANAL_CONFIG.nao_definido;
-                  const CanalIcon = canalCfg.icon;
                   return (
                   <TableRow key={lead.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => onSelectLead(lead)}>
                     <TableCell className="px-2">
@@ -262,13 +258,6 @@ export function LeadExplorer({ territorio, onSelectLead }: Props) {
                       <span className={cn("text-xs font-medium", lastContactColor(lc?.ultimo_contato_em || null))}>
                         {activityEmoji(lc?.ultimo_contato_tipo || null)} {lastContactLabel(lc?.ultimo_contato_em || null)}
                       </span>
-                    </TableCell>
-                    <TableCell>
-                      {canal !== "nao_definido" && (
-                        <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border", canalCfg.color)}>
-                          <CanalIcon className="h-3 w-3" />
-                        </span>
-                      )}
                     </TableCell>
                     <TableCell className="text-center"><ScoreCell score={lead.lead_score} /></TableCell>
                   </TableRow>

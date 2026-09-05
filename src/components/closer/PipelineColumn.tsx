@@ -5,23 +5,22 @@ interface Props {
   children: React.ReactNode;
   colorClass: string;
   count: number;
-  totalValue: number;
+  label?: string;
+  mrrTotal?: number;
 }
 
-export function PipelineColumn({ id, children, colorClass, count, totalValue }: Props) {
+export function PipelineColumn({ id, children, colorClass, count, label, mrrTotal = 0 }: Props) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div className="w-[280px] shrink-0">
       <div className={`rounded-t-lg px-3 py-2 ${colorClass}`}>
         <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold">{id}</span>
+          <span className="text-sm font-semibold">{label || id}</span>
           <span className="text-xs font-bold">{count}</span>
         </div>
-        {totalValue > 0 && (
-          <p className="text-xs opacity-75 mt-0.5">
-            R$ {totalValue.toLocaleString("pt-BR")}
-          </p>
-        )}
+        <p className="mt-1 text-xs font-medium opacity-80">
+          {mrrTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/mês
+        </p>
       </div>
       <div
         ref={setNodeRef}

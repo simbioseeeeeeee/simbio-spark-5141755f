@@ -16,10 +16,11 @@ import { CloserPipeline } from "@/components/CloserPipeline";
 import { LeadExplorer } from "@/components/LeadExplorer";
 import { LeadProfile } from "@/components/LeadProfile";
 import { NewLeadModal } from "@/components/NewLeadModal";
+import { CommercialIntelligence } from "@/components/manager/CommercialIntelligence";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
@@ -98,6 +99,97 @@ const KPI_LABELS: Record<string, string> = {
   reunioes: "Reuniões",
   pipeline: "Pipeline",
 };
+
+// ─── Placar da Máquina de Agendamento (Fase 1: 6 diagnósticos/dia) ─────────
+// Fonte: comercial_config (metas) + view comercial_painel_dia (agendadas por canal, dia BRT).
+// O placar é GLOBAL (a máquina é uma só; war por região = uma praça por vez).
+interface PlacarState {
+  metaDia: number;
+  metasCanal: Record<string, number>;
+  pracaAtual: string | null;
+  porCanal: Record<string, number>;
+  realizadas: number;
+  agendadas: number;
+}
+
+const CANAL_ABREV: Record<string, string> = {
+  instagram: "IG", whatsapp_frio: "Frio", reativacao: "Reativ", pago: "Pago",
+};
+
+function diaBRT(offsetDias = 0): string {
+  const fmt = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
+  return fmt.format(new Date(Date.now() - offsetDias * 86400000));
+}
+
+async function loadPlacar(period: number): Promise<PlacarState> {
+  const desde = diaBRT(period - 1);
+  const [cfg, painel] = await Promise.all([
+    supabase.from("comercial_config" as any).select("*").eq("id", 1).maybeSingle(),
+    supabase.from("comercial_painel_dia" as any).select("*").gte("dia", desde),
+  ]);
+  const c = (cfg.data as any) || {};
+  const rows = ((painel.data as any[]) || []);
+  const porCanal: Record<string, number> = {};
+  let realizadas = 0, agendadas = 0;
+  for (const r of rows) {
+    porCanal[r.canal] = (porCanal[r.canal] || 0) + (r.reunioes_agendadas || 0);
+    agendadas += r.reunioes_agendadas || 0;
+    realizadas += r.reunioes_realizadas || 0;
+  }
+  return {
+    metaDia: c.meta_reunioes_dia ?? 6,
+    metasCanal: c.metas_canal ?? { instagram: 2, whatsapp_frio: 1, reativacao: 2, pago: 1 },
+    pracaAtual: c.praca_atual ?? null,
+    porCanal, realizadas, agendadas,
+  };
+}
+
+function MaquinaPlacar({ placar, period }: { placar: PlacarState | null; period: number }) {
+  if (!placar) return null;
+  const mult = period;
+  const meta = placar.metaDia * mult;
+  const total = Object.entries(placar.porCanal)
+    .filter(([k]) => k in placar.metasCanal)
+    .reduce((s, [, v]) => s + v, 0);
+  const pct = meta > 0 ? Math.min(100, Math.round((total / meta) * 100)) : 0;
+  const ok = total >= meta;
+  return (
+    <Card className={ok ? "border-success/60" : "border-primary/40"}>
+      <CardContent className="p-4">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <div className="flex items-center gap-2">
+            <Target className={`h-5 w-5 ${ok ? "text-success" : "text-primary"}`} />
+            <span className="text-sm font-semibold">Máquina de Agendamento</span>
+            <span className="text-xs text-muted-foreground">
+              {period === 1 ? "hoje" : `${period} dias`} · geral
+            </span>
+          </div>
+          <div className="flex items-end gap-1.5">
+            <span className="text-3xl font-bold leading-none tabular-nums">{total}</span>
+            <span className="text-lg text-muted-foreground leading-none pb-0.5">/ {meta}</span>
+            <span className="text-xs text-muted-foreground pb-0.5 ml-1">diagnósticos agendados</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(placar.metasCanal).map(([canal, m]) => {
+              const v = placar.porCanal[canal] || 0;
+              const bateu = v >= (m as number) * mult;
+              return (
+                <span key={canal}
+                  className={`rounded px-2 py-0.5 text-xs font-medium tabular-nums ${bateu ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
+                  {CANAL_ABREV[canal] || canal} {v}/{(m as number) * mult}
+                </span>
+              );
+            })}
+          </div>
+          <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+            {placar.realizadas} de {placar.agendadas} reunião(ões) já realizada(s)
+          </span>
+        </div>
+        <Progress value={pct} className="mt-3 h-1.5" />
+      </CardContent>
+    </Card>
+  );
+}
 
 // ─── KPI Card with target, alerts & progress ────────────────
 function KpiCard({ label, value, icon: Icon, color, prefix, target, children }: { label: string; value: string | number; icon: any; color: string; prefix?: string; target?: number; children?: React.ReactNode }) {
@@ -188,7 +280,7 @@ const TARGET_LABELS: { key: keyof DailyTargets; label: string; prefix?: string }
   { key: "desq_limite", label: "Limite de Desqualificações (total)" },
 ];
 
-function TargetsEditor({ targets, onSave }: { targets: DailyTargets; onSave: (t: DailyTargets) => void }) {
+function TargetsEditor({ targets, onSave }: { targets: DailyTargets; onSave: (t: DailyTargets) => void | Promise<void> }) {
   const [draft, setDraft] = useState<DailyTargets>(targets);
   const [open, setOpen] = useState(false);
 
@@ -197,7 +289,7 @@ function TargetsEditor({ targets, onSave }: { targets: DailyTargets; onSave: (t:
     setOpen(o);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Validate: all values must be positive numbers
     const validated = { ...draft };
     for (const k of Object.keys(validated) as (keyof DailyTargets)[]) {
@@ -205,9 +297,16 @@ function TargetsEditor({ targets, onSave }: { targets: DailyTargets; onSave: (t:
       if (!v || v <= 0) validated[k] = DEFAULT_TARGETS[k];
       else validated[k] = v;
     }
-    onSave(validated);
-    setOpen(false);
-    toast({ title: "Metas atualizadas", description: "As metas diárias foram salvas com sucesso." });
+    // onSave e assincrono: sem await, o toast de sucesso saia ANTES da gravacao —
+    // e a gravacao falhava (manager_targets nao existia) sem ninguem ver.
+    try {
+      await onSave(validated);
+      setOpen(false);
+      toast({ title: "Metas atualizadas", description: "As metas diárias foram salvas." });
+    } catch (e: any) {
+      toast({ title: "Não consegui salvar a meta",
+              description: e?.message || "tente de novo", variant: "destructive" });
+    }
   };
 
   return (
@@ -252,11 +351,17 @@ function DrillDownDialog({ open, onClose, statusFilter, territorio }: { open: bo
     if (!open || !statusFilter) return;
     setLoading(true);
     const loadLeads = async () => {
-      let query = supabase.from("leads").select("*").eq("status_sdr", statusFilter);
+      let query = supabase.from("leads").select("*").is("deleted_at", null).eq("status_sdr", "Desqualificado");
+      if (statusFilter === "__other__") {
+        query = query.or('motivo_perda.is.null,motivo_perda.not.in.("sem_fit","investimento","desistencia")');
+      } else {
+        query = query.eq("motivo_perda", statusFilter);
+      }
       if (territorio) query = query.eq("cidade", territorio);
       const { data } = await query.order("created_at", { ascending: false }).limit(100);
       setLeads((data || []).map((r: any) => ({
         ...r,
+        id: r.cnpj,
         fantasia: r.fantasia || "",
         razao_social: r.razao_social || "",
         cnpj: r.cnpj || "",
@@ -269,7 +374,12 @@ function DrillDownDialog({ open, onClose, statusFilter, territorio }: { open: bo
     loadLeads();
   }, [open, statusFilter, territorio]);
 
-  const label = statusFilter.replace("Desqualificado - ", "").replace("Desqualificado", "Geral");
+  const label = ({
+    sem_fit: "Sem fit",
+    investimento: "Investimento",
+    desistencia: "Desistência",
+    __other__: "Demais motivos",
+  } as Record<string, string>)[statusFilter] || statusFilter;
 
   return (
     <>
@@ -293,7 +403,7 @@ function DrillDownDialog({ open, onClose, statusFilter, territorio }: { open: bo
                   <TableHead>CNPJ</TableHead>
                   <TableHead>Cidade</TableHead>
                   <TableHead>Bairro</TableHead>
-                  <TableHead className="text-center">Score</TableHead>
+                  <TableHead className="text-center">Pesquisa digital</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -304,7 +414,7 @@ function DrillDownDialog({ open, onClose, statusFilter, territorio }: { open: bo
                     <TableCell className="text-muted-foreground text-sm">{lead.cidade}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{lead.bairro}</TableCell>
                     <TableCell className="text-center">
-                      {lead.lead_score !== null ? <span className="font-bold text-sm">{lead.lead_score}</span> : <span className="text-muted-foreground">—</span>}
+                      {lead.lead_score !== null ? <span className="font-bold text-sm">{lead.lead_score}/100</span> : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -318,7 +428,7 @@ function DrillDownDialog({ open, onClose, statusFilter, territorio }: { open: bo
   );
 }
 
-function AnalyticsView({ territorio }: { territorio: string }) {
+function AnalyticsView({ territorio, onTerritorio }: { territorio: string; onTerritorio?: (t: string) => void }) {
   const { user } = useAuth();
   const [period, setPeriod] = useState<number>(7);
   const [analytics, setAnalytics] = useState<ManagerAnalytics | null>(null);
@@ -336,6 +446,7 @@ function AnalyticsView({ territorio }: { territorio: string }) {
   const [drillDownFilter, setDrillDownFilter] = useState<string | null>(null);
   const [inconsistencies, setInconsistencies] = useState<ReuniaoInconsistency[]>([]);
   const [fixingId, setFixingId] = useState<string | null>(null);
+  const [placar, setPlacar] = useState<PlacarState | null>(null);
 
   // Load targets from DB on mount
   useEffect(() => {
@@ -368,6 +479,8 @@ function AnalyticsView({ territorio }: { territorio: string }) {
       setSdrPerf(sp);
       setDesqTrend(dt);
       setInconsistencies(inc);
+      // placar da Máquina (global; não depende de território)
+      try { setPlacar(await loadPlacar(period)); } catch { /* non-critical */ }
 
       // Snapshot today's KPIs and check alerts
       try {
@@ -409,11 +522,11 @@ function AnalyticsView({ territorio }: { territorio: string }) {
         (payload) => {
           const newLead = payload.new as any;
           const oldLead = payload.old as any;
-          const wasNotDisqualified = !oldLead?.status_sdr?.startsWith('Desqualificado');
-          const isNowDisqualified = newLead?.status_sdr?.startsWith('Desqualificado');
+          const wasNotDisqualified = oldLead?.status_sdr !== 'Desqualificado';
+          const isNowDisqualified = newLead?.status_sdr === 'Desqualificado';
           if (wasNotDisqualified && isNowDisqualified) {
             const nome = newLead.fantasia || newLead.razao_social || 'Lead';
-            const motivo = newLead.status_sdr.replace('Desqualificado - ', '').replace('Desqualificado', 'Geral');
+            const motivo = newLead.motivo_perda || 'sem motivo registrado';
             toast({
               title: "⚠️ Lead Desqualificado",
               description: `${nome} (${newLead.cidade || '—'}) — Motivo: ${motivo}`,
@@ -452,15 +565,34 @@ function AnalyticsView({ territorio }: { territorio: string }) {
           Control Tower
           {territorio && <span className="text-sm font-normal text-muted-foreground">— {territorio}</span>}
         </h2>
-        <Tabs value={String(period)} onValueChange={(v) => setPeriod(Number(v))}>
-          <TabsList>
-            <TabsTrigger value="1">Hoje</TabsTrigger>
-            <TabsTrigger value="7">7 Dias</TabsTrigger>
-            <TabsTrigger value="30">30 Dias</TabsTrigger>
-            <TabsTrigger value="90">90 Dias</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-2 flex-wrap">
+          {placar?.pracaAtual && (
+            <Button
+              size="sm"
+              variant={territorio === placar.pracaAtual ? "default" : "outline"}
+              className="gap-1.5"
+              onClick={() => onTerritorio?.(territorio === placar.pracaAtual ? "__all__" : placar.pracaAtual!)}
+              title="War por região: filtra o painel pela praça da vez (definida em Metas do Dia)"
+            >
+              <Target className="h-3.5 w-3.5" />
+              Praça: {placar.pracaAtual}
+            </Button>
+          )}
+          <Tabs value={String(period)} onValueChange={(v) => setPeriod(Number(v))}>
+            <TabsList>
+              <TabsTrigger value="1">Hoje</TabsTrigger>
+              <TabsTrigger value="7">7 Dias</TabsTrigger>
+              <TabsTrigger value="30">30 Dias</TabsTrigger>
+              <TabsTrigger value="90">90 Dias</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
+
+      {/* Placar da Máquina de Agendamento (métrica-mãe: 6 diagnósticos/dia) */}
+      <MaquinaPlacar placar={placar} period={period} />
+
+      <CommercialIntelligence period={period} />
 
       {/* KPI Alert Banner */}
       {kpiAlerts.length > 0 && !alertsDismissed && (
@@ -510,21 +642,45 @@ function AnalyticsView({ territorio }: { territorio: string }) {
         return (
           <div className="space-y-2">
             <div className="flex items-center justify-end">
-              <TargetsEditor targets={dailyTargets} onSave={async (newT) => { setDailyTargets(newT); if (user?.id) await saveTargetsToDB(user.id, newT); }} />
+              <TargetsEditor targets={dailyTargets} onSave={async (newT) => {
+                // Antes o await rejeitava sem catch (manager_targets nem existia): a tela
+                // atualizava otimista e o valor sumia no reload. Falha de gravação precisa aparecer.
+                const anterior = dailyTargets;
+                setDailyTargets(newT);
+                if (!user?.id) return;
+                try {
+                  await saveTargetsToDB(user.id, newT);
+                } catch (e) {
+                  setDailyTargets(anterior);   // desfaz o otimista
+                  throw e;                     // quem avisa é o TargetsEditor
+                }
+              }} />
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-              <KpiCard label="Leads Qualificados" value={Number(analytics.total_leads_qualificados)} icon={Users} color="bg-primary/10 text-primary" target={t.leads} />
-              <KpiCard label="Atividades" value={Number(analytics.total_atividades)} icon={Activity} color="bg-warning/10 text-warning" target={t.atividades} />
-              <KpiCard label="Reuniões" value={Number(analytics.total_reunioes)} icon={CalendarCheck} color="bg-success/10 text-success" target={t.reunioes} />
+              <KpiCard label="Leads com Fit ≥ 70" value={Number(analytics.total_leads_qualificados)} icon={Users} color="bg-primary/10 text-primary" target={t.leads} />
+              {/* KPI do doc Fase 1: realizadas vs agendadas (no-show). Substitui "Atividades". */}
+              <KpiCard
+                label="No-show"
+                value={placar && placar.agendadas > 0
+                  ? `${Math.round((1 - placar.realizadas / placar.agendadas) * 100)}%`
+                  : "—"}
+                icon={Activity}
+                color="bg-warning/10 text-warning"
+              >
+                <p className="text-[11px] text-muted-foreground pt-1 tabular-nums">
+                  {placar ? `${placar.realizadas} realizadas / ${placar.agendadas} agendadas` : ""}
+                </p>
+              </KpiCard>
+              <KpiCard label="Reuniões Agendadas" value={Number(analytics.total_reunioes)} icon={CalendarCheck} color="bg-success/10 text-success" target={placar ? placar.metaDia * mult : t.reunioes} />
               <KpiCard label="Fechamentos" value={Number(analytics.total_fechamentos)} icon={Target} color="bg-success/10 text-success" target={t.fechamentos} />
               <KpiCard label="Desqualificados" value={Number(analytics.total_desqualificados)} icon={AlertTriangle} color="bg-destructive/10 text-destructive">
                 {Number(analytics.total_desqualificados) > 0 && (
                   <div className="space-y-1 pt-1">
                     {[
-                      { label: "Sem Perfil", value: analytics.desq_sem_perfil, filter: "Desqualificado - Sem Perfil" },
-                      { label: "Sem Budget", value: analytics.desq_sem_budget, filter: "Desqualificado - Sem Budget" },
-                      { label: "Sem Interesse", value: analytics.desq_sem_interesse, filter: "Desqualificado - Sem Interesse" },
-                      { label: "Geral", value: analytics.desq_geral, filter: "Desqualificado" },
+                      { label: "Sem fit", value: analytics.desq_sem_perfil, filter: "sem_fit" },
+                      { label: "Investimento", value: analytics.desq_sem_budget, filter: "investimento" },
+                      { label: "Desistência", value: analytics.desq_sem_interesse, filter: "desistencia" },
+                      { label: "Demais motivos", value: analytics.desq_geral, filter: "__other__" },
                     ].filter(i => i.value > 0).map((item) => (
                       <div
                         key={item.label}
@@ -842,34 +998,43 @@ function AnalyticsView({ territorio }: { territorio: string }) {
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground mb-3">
-              Estes leads possuem status "Reunião Agendada" mas nenhuma atividade "Agendou Reunião" foi registrada. A métrica de reuniões não os contabiliza.
+              Estes leads possuem status "Reunião Agendada" mas não têm o registro canônico da atividade de agendamento. A métrica de reuniões não os contabiliza.
+              A evidência abaixo é somente leitura e vem do Calendar/Meet.
             </p>
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead>Lead</TableHead>
                   <TableHead>Cidade</TableHead>
+                  <TableHead>Agenda confirmada</TableHead>
                   <TableHead>Criado em</TableHead>
                   <TableHead className="w-[120px] text-right">Ação</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {inconsistencies.map((inc) => (
-                  <TableRow key={inc.id}>
+                  <TableRow key={inc.cnpj}>
                     <TableCell className="font-medium">{inc.fantasia || inc.razao_social || "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{inc.cidade || "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      <div>{inc.data_reuniao_agendada ? new Date(inc.data_reuniao_agendada).toLocaleString("pt-BR") : "sem data"}</div>
+                      <div className="max-w-[180px] truncate" title={inc.meeting_event_id || undefined}>
+                        {inc.meeting_event_id || "sem event_id"}
+                      </div>
+                      {inc.reuniao_url && <a className="text-primary underline" href={inc.reuniao_url} target="_blank" rel="noreferrer">abrir link</a>}
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{new Date(inc.created_at).toLocaleDateString("pt-BR")}</TableCell>
                     <TableCell className="text-right">
                       <Button
                         size="sm"
                         variant="outline"
                         className="h-7 text-xs gap-1"
-                        disabled={fixingId === inc.id}
+                        disabled={fixingId === inc.cnpj || !inc.meeting_event_id || !inc.data_reuniao_agendada || !inc.reuniao_url}
                         onClick={async () => {
-                          setFixingId(inc.id);
+                          setFixingId(inc.cnpj);
                           try {
-                            await registrarReuniaoAgendada({ id: inc.id, sdr_id: null, owner_id: null }, user?.id);
-                            setInconsistencies((prev) => prev.filter((i) => i.id !== inc.id));
+                            await registrarReuniaoAgendada({ id: inc.cnpj, cnpj: inc.cnpj }, user?.id);
+                            setInconsistencies((prev) => prev.filter((i) => i.cnpj !== inc.cnpj));
                             toast({ title: "✅ Corrigido", description: `Reunião contabilizada para ${inc.fantasia || inc.razao_social}.` });
                             loadData();
                           } catch (err: any) {
@@ -879,7 +1044,7 @@ function AnalyticsView({ territorio }: { territorio: string }) {
                           }
                         }}
                       >
-                        {fixingId === inc.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                        {fixingId === inc.cnpj ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
                         Corrigir
                       </Button>
                     </TableCell>
@@ -947,7 +1112,7 @@ export default function ManagerWorkspace() {
 
   return (
     <AppLayout headerExtra={needsTerritory ? <TerritorySelector value={territorio} onChange={setTerritorio} showAll={isAnalytics} /> : undefined}>
-      {isAnalytics && <AnalyticsView territorio={territorio === "__all__" ? "" : territorio} />}
+      {isAnalytics && <AnalyticsView territorio={territorio === "__all__" ? "" : territorio} onTerritorio={setTerritorio} />}
       {isCadencia && <SdrCadenciaForManager />}
       {isPipeline && <ManagerPipelineView />}
       {isExplorer && <ManagerExplorerView territorio={territorio} />}
@@ -956,8 +1121,8 @@ export default function ManagerWorkspace() {
 }
 
 // Simplified cadencia view for Manager
-import { CADENCE_STEPS } from "@/types/lead";
 import { ActivityModal } from "@/components/ActivityModal";
+import { CadenceManager } from "@/components/manager/CadenceManager";
 
 import { Crosshair, Search, Phone, MessageSquare, Bot } from "lucide-react";
 
@@ -994,7 +1159,12 @@ function SdrCadenciaForManager() {
   };
 
   return (
-    <>
+    <Tabs defaultValue="fila" className="space-y-4">
+      <TabsList aria-label="Operação e configuração da cadência">
+        <TabsTrigger value="fila">Fila SDR</TabsTrigger>
+        <TabsTrigger value="configuracao">Configuração versionada</TabsTrigger>
+      </TabsList>
+      <TabsContent value="fila" className="space-y-4">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="rounded-lg border border-border bg-card p-4 flex items-center gap-3">
           <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-primary/10 text-primary"><Search className="h-5 w-5" /></div>
@@ -1040,7 +1210,6 @@ function SdrCadenciaForManager() {
       ) : (
         <div className="space-y-2">
           {filteredCadencia.map((lead) => {
-            const step = CADENCE_STEPS[lead.dia_cadencia] || `Passo ${lead.dia_cadencia + 1}`;
             const isOverdue = lead.data_proximo_passo && new Date(lead.data_proximo_passo) < new Date();
             return (
               <div key={lead.id} className="rounded-lg border border-border bg-card p-3 flex items-center gap-3 hover:border-primary/30 transition-colors">
@@ -1051,7 +1220,9 @@ function SdrCadenciaForManager() {
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className={`text-xs font-medium ${isOverdue ? 'text-destructive' : 'text-primary'}`}>
-                      Dia {lead.dia_cadencia}: {step}
+                      {lead.data_proximo_passo
+                        ? `Próximo passo: ${new Date(lead.data_proximo_passo).toLocaleString("pt-BR")}`
+                        : "Próximo passo a definir"}
                     </span>
                     {isOverdue && <span className="text-xs text-destructive">(Atrasado)</span>}
                     <span className="text-xs text-muted-foreground">· {lead.cidade}</span>
@@ -1064,9 +1235,12 @@ function SdrCadenciaForManager() {
         </div>
       )}
 
-      <LeadProfile lead={selectedLead} open={!!selectedLead} onClose={() => setSelectedLead(null)} onSaved={(u) => setSelectedLead(u)} />
-      <ActivityModal lead={activityLead} open={!!activityLead} onClose={() => setActivityLead(null)} onDone={handleActivityDone} userId={user?.id} />
-    </>
+        <LeadProfile lead={selectedLead} open={!!selectedLead} onClose={() => setSelectedLead(null)} onSaved={(u) => setSelectedLead(u)} />
+        <ActivityModal lead={activityLead} open={!!activityLead} onClose={() => setActivityLead(null)} onDone={handleActivityDone} userId={user?.id} mode="cadence" />
+      </TabsContent>
+      <TabsContent value="configuracao">
+        <CadenceManager />
+      </TabsContent>
+    </Tabs>
   );
 }
-

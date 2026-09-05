@@ -1,9 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Phone, Mail, MessageCircle, Calendar, FileText, StickyNote, Instagram } from "lucide-react";
 import { formatDistanceToNow, format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ACTIVITY_RESULT_LABEL, ACTIVITY_TYPE_LABEL, isActivityResult, isActivityType } from "@/lib/crm-domain";
+import { errorMessage } from "@/lib/api-error";
 
 interface TimelineEntry {
   id: string;
@@ -19,6 +22,13 @@ const ICON_MAP: Record<string, { icon: React.ElementType; color: string }> = {
   Email: { icon: Mail, color: "text-muted-foreground bg-muted" },
   Pesquisa: { icon: StickyNote, color: "text-warning bg-warning/10" },
   Visita: { icon: Calendar, color: "text-primary bg-primary/10" },
+  whatsapp_out: { icon: MessageCircle, color: "text-success bg-success/10" },
+  whatsapp_in: { icon: MessageCircle, color: "text-success bg-success/10" },
+  ligacao: { icon: Phone, color: "text-primary bg-primary/10" },
+  email_out: { icon: Mail, color: "text-muted-foreground bg-muted" },
+  email_in: { icon: Mail, color: "text-muted-foreground bg-muted" },
+  reuniao: { icon: Calendar, color: "text-primary bg-primary/10" },
+  nota: { icon: StickyNote, color: "text-warning bg-warning/10" },
 };
 
 const RESULTADO_COLORS: Record<string, string> = {
@@ -31,6 +41,11 @@ const RESULTADO_COLORS: Record<string, string> = {
   "Sem Resposta": "bg-muted text-muted-foreground border-border",
   "Recusou": "bg-destructive/15 text-destructive border-destructive/30",
   "Pesquisa Concluída": "bg-warning/15 text-warning border-warning/30",
+  sucesso: "bg-success/15 text-success border-success/30",
+  agendado: "bg-primary/15 text-primary border-primary/30",
+  sem_resposta: "bg-muted text-muted-foreground border-border",
+  recusa: "bg-destructive/15 text-destructive border-destructive/30",
+  erro: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
 function formatDayLabel(dateStr: string): string {
@@ -52,31 +67,61 @@ function groupByDay(entries: TimelineEntry[]): Map<string, TimelineEntry[]> {
 
 interface Props {
   leadId: string;
+  refreshKey?: number;
 }
 
-export function LeadTimeline({ leadId }: Props) {
+export function LeadTimeline({ leadId, refreshKey = 0 }: Props) {
   const [entries, setEntries] = useState<TimelineEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const { data, error } = await supabase
+        .rpc("get_lead_atividades" as never, { p_lead_id: leadId, p_limit: 100 } as never);
+      if (error) throw error;
+      setEntries((data || []) as TimelineEntry[]);
+    } catch (error: unknown) {
+      setLoadError(errorMessage(error, "Não foi possível carregar a timeline."));
+    } finally {
+      setLoading(false);
+    }
+  }, [leadId]);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .rpc("get_lead_atividades" as any, { p_lead_id: leadId, p_limit: 100 });
-        if (error) console.error(error);
-        setEntries((data || []) as TimelineEntry[]);
-      } finally {
-        setLoading(false);
-      }
-    };
     load();
-  }, [leadId]);
+  }, [load, refreshKey]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`lead-timeline-${leadId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "atividades", filter: `lead_cnpj=eq.${leadId}` },
+        () => { void load(); },
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [leadId, load]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-center">
+        <p className="text-sm font-medium text-destructive">Timeline indisponível</p>
+        <p className="mt-1 text-xs text-muted-foreground">{loadError}</p>
+        <Button type="button" size="sm" variant="outline" className="mt-3" onClick={load}>
+          Tentar novamente
+        </Button>
       </div>
     );
   }
@@ -141,9 +186,11 @@ function TimelineItem({
       </div>
       <div className="space-y-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium">{entry.tipo_atividade}</span>
+          <span className="text-sm font-medium">
+            {isActivityType(entry.tipo_atividade) ? ACTIVITY_TYPE_LABEL[entry.tipo_atividade] : entry.tipo_atividade}
+          </span>
           <span className={cn("inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold border", resultColor)}>
-            {entry.resultado}
+            {isActivityResult(entry.resultado) ? ACTIVITY_RESULT_LABEL[entry.resultado] : entry.resultado}
           </span>
           <span className="text-[11px] text-muted-foreground ml-auto">
             {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true, locale: ptBR })}
